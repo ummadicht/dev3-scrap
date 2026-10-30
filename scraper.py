@@ -261,16 +261,29 @@ class CashifyScraper:
         if camera_match:
             camera_values = re.findall(
                 r'["\\]+dval["\\]+\s*:\s*["\\]+([^"\\]+)',
+                camera_match.group(1),
+            )
             if camera_values:
                 cameras = ", ".join(camera_values)
         # --------------------------------------------------
+        # 5. Build pricing record
+        # --------------------------------------------------
+        record = MobilePriceRecord(
+            brand=brand or "Unknown",
+            model=model_name,
             storage=storage_val,
+            ram=ram_val,
+            cores=cores_val,
             camera=cameras,
+            condition="Grade A: Like New / Flawless (Max Quote)",
             defects="None (Assumed Grade A condition)",
+            buyback_price=price,
             source_url=url,
+            timestamp=datetime.now(timezone.utc).isoformat(),
             data_origin="verified_scraped",
             currency="INR",
             confidence_score=1.0,
+        )
         logger.info(
             "Price extracted: %s | %s | INR %d | Source: %s",
             record.model,
@@ -282,6 +295,7 @@ class CashifyScraper:
     def scrape_url(self, url: str) -> List[MobilePriceRecord]:
         """
         Scrape a Cashify product URL.
+        Supports both parent product pages and individual variant pages.
         Parent pages:
             Discovers variant URLs and fetches each variant separately.
         Variant pages:
@@ -289,6 +303,7 @@ class CashifyScraper:
         Returns:
             List of successfully extracted MobilePriceRecord objects.
         """
+        records: List[MobilePriceRecord] = []
         html = self.fetch_page(url)
         if not html:
             return records
@@ -383,17 +398,4 @@ class CashifyScraper:
             url,
             len(records),
         )
-        return records        records: List[MobilePriceRecord] = []
-        Supports both parent product pages and individual variant pages.
-        )
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            buyback_price=price,
-            condition="Grade A: Like New / Flawless (Max Quote)",
-            cores=cores_val,
-            ram=ram_val,
-            brand=brand or "Unknown",
-            model=model_name,
-        record = MobilePriceRecord(
-        # --------------------------------------------------
-        # 5. Build pricing record
-                camera_match.group(1),
+        return records
