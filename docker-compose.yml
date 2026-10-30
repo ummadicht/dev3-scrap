@@ -1,0 +1,19 @@
+services:
+  mobile-scraping:
+    image: mobile-scraping:${IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mobile-scraping
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - prod_net
+
+networks:
+  prod_net:
+    external: true
+    name: platform_prod_net
