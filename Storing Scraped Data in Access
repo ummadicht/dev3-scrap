@@ -1,0 +1,1235 @@
+{
+  "runSettings": {
+    "temperature": 1.0,
+    "model": "models/gemini-4-argon",
+    "topP": 0.95,
+    "topK": 64,
+    "maxOutputTokens": 32768,
+    "safetySettings": [{
+      "category": "HARM_CATEGORY_HARASSMENT",
+      "threshold": "OFF"
+    }, {
+      "category": "HARM_CATEGORY_HATE_SPEECH",
+      "threshold": "OFF"
+    }, {
+      "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+      "threshold": "OFF"
+    }, {
+      "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+      "threshold": "OFF"
+    }],
+    "enableCodeExecution": false,
+    "enableSearchAsATool": true,
+    "enableBrowseAsATool": false,
+    "thinkingBudget": -1,
+    "googleSearch": {
+    },
+    "thinkingLevel": "THINKING_MEDIUM",
+    "enableImageSearch": false,
+    "enableGoogleMaps": false,
+    "enableAgentThinkingSummariesControl": false,
+    "enableAgentVisualizationControl": false,
+    "enableAgentCollaborativePlanningControl": false,
+    "enableWordTimestamps": false,
+    "enableSpeakerDiarization": false,
+    "enablePolishedTranscript": false
+  },
+  "systemInstruction": {
+  },
+  "chunkedPrompt": {
+    "chunks": [{
+      "driveDocument": {
+        "id": "1AUUG6pyVhT2u235EYwi8dkEc3gqTHGuF"
+      },
+      "role": "user",
+      "tokenCount": 85,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1lt5cXzmgP-0IWUaLQk_6oclbPpW2VaS9"
+      },
+      "role": "user",
+      "tokenCount": 5687,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1DjFosUusw7qcCD2aonq74VWyykEb2plY"
+      },
+      "role": "user",
+      "tokenCount": 1102,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1FVhvM2c533PqhKdxXpEmGdxEEb2c5Yo8"
+      },
+      "role": "user",
+      "tokenCount": 465,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1BhQ9s7NIjFlD9hMdwArN7Uu6Mczd_HN8"
+      },
+      "role": "user",
+      "tokenCount": 684,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1xvmyPvzqlJe_m4E4GyUlX9pcQkg0BTN4"
+      },
+      "role": "user",
+      "tokenCount": 1563,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1w-KrSyJILEJvoZDyuBOt2UvNxMQeZfvV"
+      },
+      "role": "user",
+      "tokenCount": 701,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1zIq9XYVPe1lrpU5C0-VnxxDID52JIh1V"
+      },
+      "role": "user",
+      "tokenCount": 4449,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "driveDocument": {
+        "id": "1g7tzZY81f1bvwhRnhWk2J0Z8YzMwBpN-"
+      },
+      "role": "user",
+      "tokenCount": 3379,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "text": "i want output to be sent to a msaccess files and stored along with the time so that i can preapare a report compation month on month week on week and day on day\n",
+      "role": "user",
+      "tokenCount": 69,
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "text": "To store your scraped data in a **Microsoft Access (`.accdb` or `.mdb`)** database with historical timestamps and pre-calculated time dimensions (Day, Week, Month, Year) for **Day-on-Day (DoD), Week-on-Week (WoW), and Month-on-Month (MoM)** reporting, you can use `pyodbc`.\n\nUnlike `output.json` and `output.csv` (which get overwritten with the latest snapshot), the Access database will **append** every run as a historical log so you can track price changes over time.\n\n---\n\n### Prerequisites for MS Access on Windows\n1. **Install `pyodbc` and `pywin32`** (used to auto-create the `.accdb` file if it doesn\u0027t exist):\n   ```powershell\n   pip install pyodbc pywin32\n   ```\n2. **Microsoft Access Database Engine (ODBC Driver):**\n   Ensure you have the **Microsoft Access Database Engine 2016 Redistributable** installed (64-bit if your Python is 64-bit).\n\n---\n\n### 1. Update `requirements.txt`\nAdd `pyodbc` and `pywin32` to your `requirements.txt`:\n\n```text\nrequests\u003e\u003d2.31.0\nbeautifulsoup4\u003e\u003d4.12.0\npydantic\u003e\u003d2.5.0\npytest\u003e\u003d8.0.0\nflask\u003e\u003d3.1.0\npyodbc\u003e\u003d5.0.0\npywin32\u003e\u003d306; sys_platform \u003d\u003d \u0027win32\u0027\n```\n\n---\n\n### 2. Update `config.py`\nAdd the `OUTPUT_ACCESS_PATH` and table name to `config.py`:\n\n```python\n# Add under Base Paths in config.py\nOUTPUT_JSON_PATH \u003d BASE_DIR / \"output.json\"\nOUTPUT_CSV_PATH \u003d BASE_DIR / \"output.csv\"\nOUTPUT_ACCESS_PATH \u003d BASE_DIR / \"mobile_price_history.accdb\"\nACCESS_TABLE_NAME \u003d \"PriceHistory\"\n```\n\n---\n\n### 3. Update `exporter.py` (With Auto-DB Creation \u0026 Time Dimensions)\nReplace `exporter.py` with the following version. It automatically creates `mobile_price_history.accdb` if it doesn\u0027t exist, creates the `PriceHistory` table, and stores both the exact `scraped_at` DateTime and helper columns (`report_date`, `report_year`, `report_month`, `report_week`, `grade_code`) so building Access Crosstab Queries and Pivot Charts is effortless.\n\n```python\n\"\"\"\nExporter module for Mobile Price Intelligence records.\nSaves records to JSON, CSV, and Microsoft Access (.accdb) for historical DoD/WoW/MoM reporting.\n\"\"\"\nimport csv\nimport json\nimport logging\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any, Dict, List, Union\n\nfrom config import ACCESS_TABLE_NAME, OUTPUT_ACCESS_PATH\nfrom models import MobilePriceRecord\n\nlogger \u003d logging.getLogger(\"exporter\")\n\n\ndef _to_dict(rec: Union[MobilePriceRecord, Dict[str, Any]]) -\u003e Dict[str, Any]:\n    \"\"\"Normalize Pydantic model or dict to a standard dictionary.\"\"\"\n    if hasattr(rec, \"model_dump\"):\n        return rec.model_dump()\n    return dict(rec)\n\n\ndef save_to_json(records: List[Union[MobilePriceRecord, Dict[str, Any]]], file_path: Path) -\u003e None:\n    \"\"\"Save records to JSON file.\"\"\"\n    data \u003d [_to_dict(rec) for rec in records]\n    with open(file_path, \"w\", encoding\u003d\"utf-8\") as f:\n        json.dump(data, f, indent\u003d2, ensure_ascii\u003dFalse)\n    logger.info(\"Successfully exported %d records to %s\", len(records), file_path)\n\n\ndef save_to_csv(records: List[Union[MobilePriceRecord, Dict[str, Any]]], file_path: Path) -\u003e None:\n    \"\"\"Save records to CSV file.\"\"\"\n    if not records:\n        logger.warning(\"No records to export to CSV.\")\n        return\n\n    fieldnames \u003d [\n        \"brand\",\n        \"model\",\n        \"storage\",\n        \"ram\",\n        \"cores\",\n        \"camera\",\n        \"condition\",\n        \"defects\",\n        \"buyback_price\",\n        \"currency\",\n        \"data_origin\",\n        \"confidence_score\",\n        \"source_url\",\n        \"timestamp\",\n    ]\n\n    with open(file_path, \"w\", encoding\u003d\"utf-8\", newline\u003d\"\") as f:\n        writer \u003d csv.DictWriter(f, fieldnames\u003dfieldnames)\n        writer.writeheader()\n        for rec in records:\n            row \u003d _to_dict(rec)\n            writer.writerow({k: row.get(k, \"\") for k in fieldnames})\n\n    logger.info(\"Successfully exported %d records to %s\", len(records), file_path)\n\n\ndef _ensure_access_db_exists(db_path: Path) -\u003e bool:\n    \"\"\"\n    Create an empty .accdb file if it doesn\u0027t exist using ADOX COM object on Windows.\n    \"\"\"\n    if db_path.exists():\n        return True\n\n    try:\n        import win32com.client\n        catalog \u003d win32com.client.Dispatch(\"ADOX.Catalog\")\n        conn_str \u003d (\n            f\"Provider\u003dMicrosoft.ACE.OLEDB.12.0;\"\n            f\"Data Source\u003d{str(db_path.resolve())};\"\n        )\n        catalog.Create(conn_str)\n        catalog.ActiveConnection.Close()\n        logger.info(\"Created new MS Access database at %s\", db_path)\n        return True\n    except Exception as exc:\n        logger.error(\n            \"Could not auto-create Access DB file (%s). \"\n            \"Either install pywin32 + Access Database Engine or create an empty \u0027%s\u0027 manually.\",\n            exc,\n            db_path.name,\n        )\n        return False\n\n\ndef save_to_access(\n    records: List[Union[MobilePriceRecord, Dict[str, Any]]],\n    db_path: Path \u003d OUTPUT_ACCESS_PATH,\n    table_name: str \u003d ACCESS_TABLE_NAME,\n) -\u003e bool:\n    \"\"\"\n    Append pricing records to a Microsoft Access (.accdb / .mdb) database with\n    timestamp and pre-computed Day / Week / Month columns for DoD, WoW, and MoM reports.\n    \"\"\"\n    if not records:\n        logger.warning(\"No records to export to MS Access.\")\n        return False\n\n    try:\n        import pyodbc\n    except ImportError:\n        logger.error(\"pyodbc is not installed. Run \u0027pip install pyodbc\u0027 to enable MS Access export.\")\n        return False\n\n    if not _ensure_access_db_exists(db_path):\n        return False\n\n    conn_str \u003d (\n        r\"DRIVER\u003d{Microsoft Access Driver (*.mdb, *.accdb)};\"\n        f\"DBQ\u003d{str(db_path.resolve())};\"\n    )\n\n    try:\n        conn \u003d pyodbc.connect(conn_str, autocommit\u003dFalse)\n        cursor \u003d conn.cursor()\n\n        # Check if table exists\n        table_exists \u003d any(\n            row.table_name.lower() \u003d\u003d table_name.lower()\n            for row in cursor.tables(tableType\u003d\"TABLE\")\n        )\n\n        if not table_exists:\n            create_table_sql \u003d f\"\"\"\n            CREATE TABLE [{table_name}] (\n                [id] COUNTER PRIMARY KEY,\n                [brand] VARCHAR(50),\n                [model] VARCHAR(150),\n                [storage] VARCHAR(30),\n                [ram] VARCHAR(30),\n                [cores] VARCHAR(30),\n                [camera] VARCHAR(100),\n                [grade_code] VARCHAR(30),\n                [condition] VARCHAR(255),\n                [defects] VARCHAR(255),\n                [buyback_price] LONG,\n                [currency] VARCHAR(10),\n                [data_origin] VARCHAR(40),\n                [confidence_score] DOUBLE,\n                [source_url] LONGCHAR,\n                [scraped_at] DATETIME,\n                [report_date] DATETIME,\n                [report_year] INTEGER,\n                [report_month] VARCHAR(7),\n                [report_week] VARCHAR(10)\n            )\n            \"\"\"\n            cursor.execute(create_table_sql)\n            conn.commit()\n            logger.info(\"Created table [%s] in MS Access database.\", table_name)\n\n        insert_sql \u003d f\"\"\"\n        INSERT INTO [{table_name}] (\n            [brand], [model], [storage], [ram], [cores], [camera],\n            [grade_code], [condition], [defects], [buyback_price],\n            [currency], [data_origin], [confidence_score], [source_url],\n            [scraped_at], [report_date], [report_year], [report_month], [report_week]\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n        \"\"\"\n\n        batch_time \u003d datetime.now()\n        inserted_count \u003d 0\n\n        for rec in records:\n            row \u003d _to_dict(rec)\n\n            # Parse record timestamp into local naive datetime for MS Access DATETIME compatibility\n            raw_ts \u003d row.get(\"timestamp\")\n            if raw_ts:\n                try:\n                    dt \u003d datetime.fromisoformat(str(raw_ts).replace(\"Z\", \"+00:00\"))\n                    dt_local \u003d dt.astimezone().replace(tzinfo\u003dNone)\n                except ValueError:\n                    dt_local \u003d batch_time\n            else:\n                dt_local \u003d batch_time\n\n            # Truncate microseconds as MS Access DATETIME only supports seconds precision\n            dt_local \u003d dt_local.replace(microsecond\u003d0)\n            report_date \u003d datetime(dt_local.year, dt_local.month, dt_local.day)\n            iso_year, iso_week, _ \u003d dt_local.isocalendar()\n\n            condition_str \u003d str(row.get(\"condition\", \"\"))\n            grade_code \u003d condition_str.split(\":\")[0].strip() if \":\" in condition_str else condition_str[:30]\n\n            params \u003d (\n                str(row.get(\"brand\", \"\"))[:50],\n                str(row.get(\"model\", \"\"))[:150],\n                str(row.get(\"storage\", \"\"))[:30],\n                str(row.get(\"ram\") or \"\")[:30],\n                str(row.get(\"cores\") or \"\")[:30],\n                str(row.get(\"camera\") or \"\")[:100],\n                grade_code[:30],\n                condition_str[:255],\n                str(row.get(\"defects\", \"\"))[:255],\n                int(row.get(\"buyback_price\", 0)),\n                str(row.get(\"currency\", \"INR\"))[:10],\n                str(row.get(\"data_origin\", \"\"))[:40],\n                float(row.get(\"confidence_score\", 1.0)),\n                str(row.get(\"source_url\", \"\")),\n                dt_local,\n                report_date,\n                dt_local.year,\n                f\"{dt_local.year}-{dt_local.month:02d}\",  # e.g., \"2026-10\" for MoM\n                f\"{iso_year}-W{iso_week:02d}\",            # e.g., \"2026-W44\" for WoW\n            )\n            cursor.execute(insert_sql, params)\n            inserted_count +\u003d 1\n\n        conn.commit()\n        cursor.close()\n        conn.close()\n        logger.info(\n            \"Successfully appended %d historical records to MS Access (%s -\u003e [%s])\",\n            inserted_count,\n            db_path,\n            table_name,\n        )\n        return True\n\n    except Exception as exc:\n        logger.error(\"Failed to export records to MS Access: %s\", exc, exc_info\u003dTrue)\n        return False\n```\n\n---\n\n### 4. Hook `save_to_access` into `main.py` and `app.py`\n\n#### In `main.py`:\n1. Update the imports at the top of `main.py`:\n   ```python\n   from config import BASE_DIR, OUTPUT_ACCESS_PATH, OUTPUT_CSV_PATH, OUTPUT_JSON_PATH, TARGET_DEVICES\n   from exporter import save_to_access, save_to_csv, save_to_json\n   ```\n2. Inside `run_pipeline()`, right after `save_to_csv(final_records, OUTPUT_CSV_PATH)`, add:\n   ```python\n   # Export to JSON, CSV, and MS Access Historical Log\n   save_to_json(final_records, OUTPUT_JSON_PATH)\n   save_to_csv(final_records, OUTPUT_CSV_PATH)\n   save_to_access(final_records, OUTPUT_ACCESS_PATH)\n   ```\n\n#### In `app.py`:\n1. Import `OUTPUT_ACCESS_PATH` from `config` and `save_to_access` from `exporter`:\n   ```python\n   from config import (\n       CONDITION_TIERS,\n       MAX_RETRIES,\n       OUTPUT_ACCESS_PATH,\n       OUTPUT_CSV_PATH,\n       OUTPUT_JSON_PATH,\n       REQUEST_TIMEOUT_SECONDS,\n       TARGET_DEVICES,\n   )\n   from exporter import save_to_access\n   ```\n2. In `api_scrape()`, `api_scrape_all()`, and `api_recalculate_grades()`, log the newly generated records to Access:\n   - In `api_scrape()` (right after `save_to_csv_raw(existing, OUTPUT_CSV_PATH)`):\n     ```python\n     save_to_access(new_all, OUTPUT_ACCESS_PATH)\n     ```\n   - In `api_scrape_all()` (right after `save_to_csv_raw(existing, OUTPUT_CSV_PATH)`):\n     ```python\n     save_to_access(final_records, OUTPUT_ACCESS_PATH)\n     ```\n   - In `api_recalculate_grades()` (right after `save_to_csv_raw(out_dicts, OUTPUT_CSV_PATH)`):\n     ```python\n     save_to_access(recalculated, OUTPUT_ACCESS_PATH)\n     ```\n3. *(Optional)* Add a route in `app.py` to download the `.accdb` file directly from the dashboard:\n   ```python\n   @app.route(\"/download/access\")\n   def download_access():\n       \"\"\"Serve latest MS Access database file as a download.\"\"\"\n       if not OUTPUT_ACCESS_PATH.exists():\n           return \"No MS Access database available. Run a scrape first.\", 404\n       return send_file(\n           OUTPUT_ACCESS_PATH,\n           as_attachment\u003dTrue,\n           download_name\u003df\"mobile_price_history_{datetime.now().strftime(\u0027%Y%m%d_%H%M\u0027)}.accdb\",\n           mimetype\u003d\"application/msaccess\",\n       )\n   ```\n\n---\n\n### 5. Ready-to-Use MS Access SQL Queries for DoD, WoW, and MoM Reports\n\nBecause the `PriceHistory` table stores `report_date`, `report_week` (`YYYY-Www`), and `report_month` (`YYYY-MM`), you can paste these queries directly into **MS Access -\u003e Create -\u003e Query Design -\u003e SQL View**:\n\n#### A. Day-on-Day (DoD) Price Comparison (Crosstab Query)\nShows each device side-by-side with daily average buyback prices as columns:\n```sql\nTRANSFORM Avg(PriceHistory.buyback_price) AS AvgPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nPIVOT Format([report_date], \"yyyy-mm-dd\");\n```\n\n#### B. Week-on-Week (WoW) Price Comparison (Crosstab Query)\nCompares weekly pricing trends across ISO weeks (`2026-W42`, `2026-W43`, `2026-W44`, etc.):\n```sql\nTRANSFORM Avg(PriceHistory.buyback_price) AS AvgWeeklyPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nPIVOT PriceHistory.report_week;\n```\n\n#### C. Month-on-Month (MoM) Price Comparison (Crosstab Query)\nCompares monthly pricing trends (`2026-09`, `2026-10`, etc.):\n```sql\nTRANSFORM Avg(PriceHistory.buyback_price) AS AvgMonthlyPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade_code\nPIVOT PriceHistory.report_month;\n```\n\n#### D. Day-on-Day Price Variance Query (Exact Change in ₹ and %)\nShows the exact price change between a day and the previous day a device was scraped:\n```sql\nSELECT \n    cur.report_date AS CurrentDate,\n    prev.report_date AS PreviousDate,\n    cur.brand,\n    cur.model,\n    cur.storage,\n    cur.grade_code,\n    prev.buyback_price AS PrevPrice,\n    cur.buyback_price AS CurrentPrice,\n    (cur.buyback_price - prev.buyback_price) AS PriceChange_INR,\n    Round(((cur.buyback_price - prev.buyback_price) / prev.buyback_price) * 100, 2) AS Change_Pct\nFROM PriceHistory AS cur\nINNER JOIN PriceHistory AS prev \n    ON cur.model \u003d prev.model \n    AND cur.storage \u003d prev.storage \n    AND cur.grade_code \u003d prev.grade_code\nWHERE prev.report_date \u003d (\n    SELECT Max(p2.report_date)\n    FROM PriceHistory AS p2\n    WHERE p2.model \u003d cur.model\n      AND p2.storage \u003d cur.storage\n      AND p2.grade_code \u003d cur.grade_code\n      AND p2.report_date \u003c cur.report_date\n)\nORDER BY cur.report_date DESC, cur.brand, cur.model;\n```",
+      "role": "model",
+      "finishReason": "STOP",
+      "tokenCount": 4397,
+      "parts": [{
+        "text": "To store"
+      }, {
+        "text": " your scraped data in a **Microsoft Access (`.accdb` or `.mdb`)** database"
+      }, {
+        "text": " with historical timestamps and pre-calculated time dimensions (Day, Week, Month, Year) for **Day-on-Day"
+      }, {
+        "text": " (DoD), Week-on-Week (WoW), and Month-on-Month (MoM)** reporting"
+      }, {
+        "text": ", you can use `pyodbc`.\n\nUnlike `output.json` and `output.csv` (which get"
+      }, {
+        "text": " overwritten with the latest snapshot), the Access database will **append** every run as a historical log so you can track price changes"
+      }, {
+        "text": " over time.\n\n---\n\n### Prerequisites for MS Access on Windows\n1. **Install `pyodbc` and `pywin32`**"
+      }, {
+        "text": " (used to auto-create the `.accdb` file if it doesn\u0027t exist):\n   ```powershell\n"
+      }, {
+        "text": "   pip install pyodbc pywin32\n   ```\n2. **Microsoft Access Database Engine (ODBC Driver):**\n   Ensure"
+      }, {
+        "text": " you have the **Microsoft Access Database Engine 2016 Redistributable** installed (64-bit if your Python is "
+      }, {
+        "text": "64-bit).\n\n---\n\n### 1. Update `requirements.txt`\nAdd `pyodbc` and"
+      }, {
+        "text": " `pywin32` to your `requirements.txt`:\n\n```text\nrequests\u003e\u003d2.31.0"
+      }, {
+        "text": "\nbeautifulsoup4\u003e\u003d4.12.0\npydantic\u003e\u003d2.5.0\npytest\u003e\u003d8"
+      }, {
+        "text": ".0.0\nflask\u003e\u003d3.1.0\npyodbc\u003e\u003d5.0.0\npywin"
+      }, {
+        "text": "32\u003e\u003d306; sys_platform \u003d\u003d \u0027win32\u0027\n```\n\n---\n\n### 2. Update `config"
+      }, {
+        "text": ".py`\nAdd the `OUTPUT_ACCESS_PATH` and table name to `config.py`:\n\n```python\n# Add under"
+      }, {
+        "text": " Base Paths in config.py\nOUTPUT_JSON_PATH \u003d BASE_DIR / \"output.json\"\nOUTPUT_"
+      }, {
+        "text": "CSV_PATH \u003d BASE_DIR / \"output.csv\"\nOUTPUT_ACCESS_PATH \u003d BASE_DIR /"
+      }, {
+        "text": " \"mobile_price_history.accdb\"\nACCESS_TABLE_NAME \u003d \"PriceHistory\"\n```\n\n---\n\n### 3."
+      }, {
+        "text": " Update `exporter.py` (With Auto-DB Creation \u0026 Time Dimensions)\nReplace `exporter.py` with"
+      }, {
+        "text": " the following version. It automatically creates `mobile_price_history.accdb` if it doesn\u0027t exist, creates the "
+      }, {
+        "text": "`PriceHistory` table, and stores both the exact `scraped_at` DateTime and helper columns (`report_date`, `report_"
+      }, {
+        "text": "year`, `report_month`, `report_week`, `grade_code`) so building Access Crosstab Queries and Pivot Charts is"
+      }, {
+        "text": " effortless.\n\n```python\n\"\"\"\nExporter module for Mobile Price Intelligence records.\nSaves records to JSON, CSV, and Microsoft Access (."
+      }, {
+        "text": "accdb) for historical DoD/WoW/MoM reporting.\n\"\"\"\nimport csv\nimport json\nimport logging\nfrom"
+      }, {
+        "text": " datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any, Dict, List, Union\n\nfrom config"
+      }, {
+        "text": " import ACCESS_TABLE_NAME, OUTPUT_ACCESS_PATH\nfrom models import MobilePriceRecord\n\nlogger \u003d logging."
+      }, {
+        "text": "getLogger(\"exporter\")\n\n\ndef _to_dict(rec: Union[MobilePriceRecord, Dict[str,"
+      }, {
+        "text": " Any]]) -\u003e Dict[str, Any]:\n    \"\"\"Normalize Pydantic model or dict to a standard dictionary.\"\"\"\n    if hasattr(rec, \"model_dump\"):\n        return rec.model_dump()\n    return dict(rec)\n\n\ndef save_to_json(records"
+      }, {
+        "text": ": List[Union[MobilePriceRecord, Dict[str, Any]]], file_path: Path) -\u003e None:\n    \"\"\"Save records to JSON"
+      }, {
+        "text": " file.\"\"\"\n    data \u003d [_to_dict(rec) for rec in records]\n    with open(file"
+      }, {
+        "text": "_path, \"w\", encoding\u003d\"utf-8\") as f:\n        json.dump(data, f"
+      }, {
+        "text": ", indent\u003d2, ensure_ascii\u003dFalse)\n    logger.info(\"Successfully exported %d records to %"
+      }, {
+        "text": "s\", len(records), file_path)\n\n\ndef save_to_csv(records: List[Union[MobilePriceRecord, Dict"
+      }, {
+        "text": "[str, Any]]], file_path: Path) -\u003e None:\n    \"\"\"Save records to CSV file.\"\"\"\n"
+      }, {
+        "text": "    if not records:\n        logger.warning(\"No records to export to CSV.\")\n        return\n\n    field"
+      }, {
+        "text": "names \u003d [\n        \"brand\",\n        \"model\",\n        \"storage\",\n        \"ram\",\n        \"cores\",\n        "
+      }, {
+        "text": "\"camera\",\n        \"condition\",\n        \"defects\",\n        \"buyback_price\",\n        \"currency\",\n        \"data"
+      }, {
+        "text": "_origin\",\n        \"confidence_score\",\n        \"source_url\",\n        \"timestamp\",\n    ]\n\n    with open"
+      }, {
+        "text": "(file_path, \"w\", encoding\u003d\"utf-8\", newline\u003d\"\") as f:\n        writer \u003d csv.DictWriter(f, fieldnames"
+      }, {
+        "text": "\u003dfieldnames)\n        writer.writeheader()\n        for rec in records:\n            row \u003d _to"
+      }, {
+        "text": "_dict(rec)\n            writer.writerow({k: row.get(k, \"\") for k in fieldnames"
+      }, {
+        "text": "})\n\n    logger.info(\"Successfully exported %d records to %s\", len(records), file_path)"
+      }, {
+        "text": "\n\n\ndef _ensure_access_db_exists(db_path: Path) -\u003e bool:\n    \"\"\"\n"
+      }, {
+        "text": "    Create an empty .accdb file if it doesn\u0027t exist using ADOX COM object on Windows.\n    \"\"\""
+      }, {
+        "text": "\n    if db_path.exists():\n        return True\n\n    try:\n        import win32com"
+      }, {
+        "text": ".client\n        catalog \u003d win32com.client.Dispatch(\"ADOX.Catalog\")\n        conn_str \u003d (\n            f\""
+      }, {
+        "text": "Provider\u003dMicrosoft.ACE.OLEDB.12.0;\"\n            f\"Data Source\u003d{str(db_path.resolve())"
+      }, {
+        "text": "};\"\n        )\n        catalog.Create(conn_str)\n        catalog.ActiveConnection.Close()\n        logger"
+      }, {
+        "text": ".info(\"Created new MS Access database at %s\", db_path)\n        return True\n    except Exception"
+      }, {
+        "text": " as exc:\n        logger.error(\n            \"Could not auto-create Access DB file (%s). \"\n            \"Either"
+      }, {
+        "text": " install pywin32 + Access Database Engine or create an empty \u0027%s\u0027 manually.\",\n            exc,\n            db_path.name,"
+      }, {
+        "text": "\n        )\n        return False\n\n\ndef save_to_access(\n    records: List[Union[Mobile"
+      }, {
+        "text": "PriceRecord, Dict[str, Any]]],\n    db_path: Path \u003d OUTPUT_ACCESS_PATH,\n    table_name: str \u003d"
+      }, {
+        "text": " ACCESS_TABLE_NAME,\n) -\u003e bool:\n    \"\"\"\n    Append pricing records to a Microsoft Access (."
+      }, {
+        "text": "accdb / .mdb) database with\n    timestamp and pre-computed Day / Week / Month columns for DoD, WoW, and MoM"
+      }, {
+        "text": " reports.\n    \"\"\"\n    if not records:\n        logger.warning(\"No records to export to MS Access.\")\n        return False\n\n    "
+      }, {
+        "text": "try:\n        import pyodbc\n    except ImportError:\n        logger.error(\"pyodbc is not installed. Run \u0027pip install py"
+      }, {
+        "text": "odbc\u0027 to enable MS Access export.\")\n        return False\n\n    if not _ensure_access_db_exists(db_path"
+      }, {
+        "text": "):\n        return False\n\n    conn_str \u003d (\n        r\"DRIVER\u003d{Microsoft Access Driver (*.mdb, *.accdb)};\"\n        "
+      }, {
+        "text": "f\"DBQ\u003d{str(db_path.resolve())};\"\n    )\n\n    try:\n        "
+      }, {
+        "text": "conn \u003d pyodbc.connect(conn_str, autocommit\u003dFalse)\n        cursor \u003d conn.cursor()\n\n        # Check if table exists"
+      }, {
+        "text": "\n        table_exists \u003d any(\n            row.table_name.lower() \u003d\u003d table_name.lower()"
+      }, {
+        "text": "\n            for row in cursor.tables(tableType\u003d\"TABLE\")\n        )\n\n        if not table_exists:\n            "
+      }, {
+        "text": "create_table_sql \u003d f\"\"\"\n            CREATE TABLE [{table_name}] (\n                [id] COUNTER"
+      }, {
+        "text": " PRIMARY KEY,\n                [brand] VARCHAR(50),\n                [model] VARCHAR(150),\n                ["
+      }, {
+        "text": "storage] VARCHAR(30),\n                [ram] VARCHAR(30),\n                [cores] VARCHAR(30),\n                "
+      }, {
+        "text": "[camera] VARCHAR(100),\n                [grade_code] VARCHAR(30),\n                [condition] VARCHAR"
+      }, {
+        "text": "(255),\n                [defects] VARCHAR(255),\n                [buyback_price"
+      }, {
+        "text": "] LONG,\n                [currency] VARCHAR(10),\n                [data_origin] VARCHAR(40),\n                [confidence_score"
+      }, {
+        "text": "] DOUBLE,\n                [source_url] LONGCHAR,\n                [scraped_at] DATETIME,\n                [report_date"
+      }, {
+        "text": "] DATETIME,\n                [report_year] INTEGER,\n                [report_month] VARCHAR(7),\n                [report_week]"
+      }, {
+        "text": " VARCHAR(10)\n            )\n            \"\"\"\n            cursor.execute(create_table_sql)\n            conn.commit()"
+      }, {
+        "text": "\n            logger.info(\"Created table [%s] in MS Access database.\", table_name)\n\n        insert_"
+      }, {
+        "text": "sql \u003d f\"\"\"\n        INSERT INTO [{table_name}] (\n            [brand], [model], [storage], [ram], ["
+      }, {
+        "text": "cores], [camera],\n            [grade_code], [condition], [defects], [buyback_price"
+      }, {
+        "text": "],\n            [currency], [data_origin], [confidence_score], [source_url],\n            [scraped"
+      }, {
+        "text": "_at], [report_date], [report_year], [report_month], [report_week]\n        ) VALUES (?, ?, ?,"
+      }, {
+        "text": " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n        \"\"\"\n\n        batch_time"
+      }, {
+        "text": " \u003d datetime.now()\n        inserted_count \u003d 0\n\n        for rec in records:\n            row \u003d _to_dict("
+      }, {
+        "text": "rec)\n\n            # Parse record timestamp into local naive datetime for MS Access DATETIME compatibility\n            raw_ts \u003d row."
+      }, {
+        "text": "get(\"timestamp\")\n            if raw_ts:\n                try:\n                    dt \u003d datetime.fromisoformat("
+      }, {
+        "text": "str(raw_ts).replace(\"Z\", \"+00:00\"))\n                    dt_local \u003d dt.astimezone()."
+      }, {
+        "text": "replace(tzinfo\u003dNone)\n                except ValueError:\n                    dt_local \u003d batch_time\n            else:\n                dt_local \u003d batch_time\n\n            # Truncate microseconds as MS Access DATETIME only supports seconds precision\n            dt_local \u003d dt_"
+      }, {
+        "text": "local.replace(microsecond\u003d0)\n            report_date \u003d datetime(dt_local.year, dt_local.month"
+      }, {
+        "text": ", dt_local.day)\n            iso_year, iso_week, _ \u003d dt_local.isocalendar()\n\n            condition"
+      }, {
+        "text": "_str \u003d str(row.get(\"condition\", \"\"))\n            grade_code \u003d condition_str.split(\":\")[0].strip"
+      }, {
+        "text": "() if \":\" in condition_str else condition_str[:30]\n\n            params \u003d (\n                str(row."
+      }, {
+        "text": "get(\"brand\", \"\"))[:50],\n                str(row.get(\"model\", \"\"))[:150"
+      }, {
+        "text": "],\n                str(row.get(\"storage\", \"\"))[:30],\n                str(row.get(\""
+      }, {
+        "text": "ram\") or \"\")[:30],\n                str(row.get(\"cores\") or \"\")[:30],"
+      }, {
+        "text": "\n                str(row.get(\"camera\") or \"\")[:100],\n                grade_code[:3"
+      }, {
+        "text": "0],\n                condition_str[:255],\n                str(row.get(\"defects\", \"\"))"
+      }, {
+        "text": "[:255],\n                int(row.get(\"buyback_price\", 0)),\n                str(row.get(\""
+      }, {
+        "text": "currency\", \"INR\"))[:10],\n                str(row.get(\"data_origin\", \"\"))[:4"
+      }, {
+        "text": "0],\n                float(row.get(\"confidence_score\", 1.0)),\n                str(row"
+      }, {
+        "text": ".get(\"source_url\", \"\")),\n                dt_local,\n                report_date,\n                dt_local.year,\n                "
+      }, {
+        "text": "f\"{dt_local.year}-{dt_local.month:02d}\",  # e.g., \""
+      }, {
+        "text": "2026-10\" for MoM\n                f\"{iso_year}-W{iso_week:02d"
+      }, {
+        "text": "}\",            # e.g., \"2026-W44\" for WoW\n            )\n            cursor"
+      }, {
+        "text": ".execute(insert_sql, params)\n            inserted_count +\u003d 1\n\n        conn.commit()\n"
+      }, {
+        "text": "        cursor.close()\n        conn.close()\n        logger.info(\n            \"Successfully appended %d historical records to"
+      }, {
+        "text": " MS Access (%s -\u003e [%s])\",\n            inserted_count,\n            db_path,\n            table"
+      }, {
+        "text": "_name,\n        )\n        return True\n\n    except Exception as exc:\n        logger.error(\"Failed to export"
+      }, {
+        "text": " records to MS Access: %s\", exc, exc_info\u003dTrue)\n        return False\n```\n\n---\n\n### 4."
+      }, {
+        "text": " Hook `save_to_access` into `main.py` and `app.py`\n\n#### In `main.py`:\n1"
+      }, {
+        "text": ". Update the imports at the top of `main.py`:\n   ```python\n   from config import BASE_DIR,"
+      }, {
+        "text": " OUTPUT_ACCESS_PATH, OUTPUT_CSV_PATH, OUTPUT_JSON_PATH, TARGET_DEVICES\n   from exporter import save_to_access"
+      }, {
+        "text": ", save_to_csv, save_to_json\n   ```\n2. Inside `run_pipeline()`,"
+      }, {
+        "text": " right after `save_to_csv(final_records, OUTPUT_CSV_PATH)`, add:\n   ```python\n   "
+      }, {
+        "text": "# Export to JSON, CSV, and MS Access Historical Log\n   save_to_json(final_records, OUTPUT_JSON"
+      }, {
+        "text": "_PATH)\n   save_to_csv(final_records, OUTPUT_CSV_PATH)\n   save"
+      }, {
+        "text": "_to_access(final_records, OUTPUT_ACCESS_PATH)\n   ```\n\n#### In `app.py`:\n1. Import"
+      }, {
+        "text": " `OUTPUT_ACCESS_PATH` from `config` and `save_to_access` from `exporter`:\n"
+      }, {
+        "text": "   ```python\n   from config import (\n       CONDITION_TIERS,\n       MAX_RETRIES,\n"
+      }, {
+        "text": "       OUTPUT_ACCESS_PATH,\n       OUTPUT_CSV_PATH,\n       OUTPUT_JSON_PATH,\n"
+      }, {
+        "text": "       REQUEST_TIMEOUT_SECONDS,\n       TARGET_DEVICES,\n   )\n   from exporter import save_to"
+      }, {
+        "text": "_access\n   ```\n2. In `api_scrape()`, `api_scrape_all()`, and `api_recalculate_grades()`,"
+      }, {
+        "text": " log the newly generated records to Access:\n   - In `api_scrape()` (right after `save_to_csv_"
+      }, {
+        "text": "raw(existing, OUTPUT_CSV_PATH)`):\n     ```python\n     save_to_access(new"
+      }, {
+        "text": "_all, OUTPUT_ACCESS_PATH)\n     ```\n   - In `api_scrape_all()` ("
+      }, {
+        "text": "right after `save_to_csv_raw(existing, OUTPUT_CSV_PATH)`):\n     ```python"
+      }, {
+        "text": "\n     save_to_access(final_records, OUTPUT_ACCESS_PATH)\n     ```\n   -"
+      }, {
+        "text": " In `api_recalculate_grades()` (right after `save_to_csv_raw(out_dicts"
+      }, {
+        "text": ", OUTPUT_CSV_PATH)`):\n     ```python\n     save_to_access(recalculated, OUTPUT_ACCESS_PATH)\n     "
+      }, {
+        "text": "```\n3. *(Optional)* Add a route in `app.py` to download the `.accdb` file"
+      }, {
+        "text": " directly from the dashboard:\n   ```python\n   @app.route(\"/download/access\")\n   def download_access():"
+      }, {
+        "text": "\n       \"\"\"Serve latest MS Access database file as a download.\"\"\"\n       if not OUTPUT_ACCESS_PATH.exists():"
+      }, {
+        "text": "\n           return \"No MS Access database available. Run a scrape first.\", 404\n       return send_"
+      }, {
+        "text": "file(\n           OUTPUT_ACCESS_PATH,\n           as_attachment\u003dTrue,\n           download_name\u003d"
+      }, {
+        "text": "f\"mobile_price_history_{datetime.now().strftime(\u0027%Y%m%d_%H%M\u0027)"
+      }, {
+        "text": "}.accdb\",\n           mimetype\u003d\"application/msaccess\",\n       )\n   ```\n\n---\n\n### 5. Ready"
+      }, {
+        "text": "-to-Use MS Access SQL Queries for DoD, WoW, and MoM Reports\n\nBecause the `Price"
+      }, {
+        "text": "History` table stores `report_date`, `report_week` (`YYYY-Www`), and `report_"
+      }, {
+        "text": "month` (`YYYY-MM`), you can paste these queries directly into **MS Access -\u003e Create -\u003e Query Design -\u003e SQL"
+      }, {
+        "text": " View**:\n\n#### A. Day-on-Day (DoD) Price Comparison (Crosstab Query)\nShows"
+      }, {
+        "text": " each device side-by-side with daily average buyback prices as columns:\n```sql\nTRANSFORM Avg(PriceHistory.buyback_price"
+      }, {
+        "text": ") AS AvgPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage, "
+      }, {
+        "text": "\n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory.brand, \n    PriceHistory.model"
+      }, {
+        "text": ", \n    PriceHistory.storage, \n    PriceHistory.grade_code\nPIVOT Format([report_date],"
+      }, {
+        "text": " \"yyyy-mm-dd\");\n```\n\n#### B. Week-on-Week (WoW) Price Comparison"
+      }, {
+        "text": " (Crosstab Query)\nCompares weekly pricing trends across ISO weeks (`2026-W42`, `2026-W"
+      }, {
+        "text": "43`, `2026-W44`, etc.):\n```sql\nTRANSFORM Avg(PriceHistory.buyback_price"
+      }, {
+        "text": ") AS AvgWeeklyPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory"
+      }, {
+        "text": ".storage, \n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory"
+      }, {
+        "text": ".brand, \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory"
+      }, {
+        "text": ".grade_code\nPIVOT PriceHistory.report_week;\n```\n\n#### C. Month-on-"
+      }, {
+        "text": "Month (MoM) Price Comparison (Crosstab Query)\nCompares monthly pricing trends (`2026-09`,"
+      }, {
+        "text": " `2026-10`, etc.):\n```sql\nTRANSFORM Avg(PriceHistory.buyback_"
+      }, {
+        "text": "price) AS AvgMonthlyPrice\nSELECT \n    PriceHistory.brand, \n    PriceHistory.model, \n    PriceHistory.storage"
+      }, {
+        "text": ", \n    PriceHistory.grade_code\nFROM PriceHistory\nGROUP BY \n    PriceHistory.brand"
+      }, {
+        "text": ", \n    PriceHistory.model, \n    PriceHistory.storage, \n    PriceHistory.grade"
+      }, {
+        "text": "_code\nPIVOT PriceHistory.report_month;\n```\n\n#### D. Day-on-Day Price"
+      }, {
+        "text": " Variance Query (Exact Change in ₹ and %)\nShows the exact price change between a day and the previous day a device was scraped:\n```sql\n"
+      }, {
+        "text": "SELECT \n    cur.report_date AS CurrentDate,\n    prev.report_date AS PreviousDate,"
+      }, {
+        "text": "\n    cur.brand,\n    cur.model,\n    cur.storage,\n    cur.grade_code,\n    prev"
+      }, {
+        "text": ".buyback_price AS PrevPrice,\n    cur.buyback_price AS CurrentPrice,\n    (cur.buyback_price -"
+      }, {
+        "text": " prev.buyback_price) AS PriceChange_INR,\n    Round(((cur.buyback_price - prev."
+      }, {
+        "text": "buyback_price) / prev.buyback_price) * 100, 2) AS Change"
+      }, {
+        "text": "_Pct\nFROM PriceHistory AS cur\nINNER JOIN PriceHistory AS prev \n    ON cur.model \u003d prev"
+      }, {
+        "text": ".model \n    AND cur.storage \u003d prev.storage \n    AND cur.grade_code \u003d prev.grade_code\n"
+      }, {
+        "text": "WHERE prev.report_date \u003d (\n    SELECT Max(p2.report_date)\n    FROM PriceHistory AS p2\n"
+      }, {
+        "text": "    WHERE p2.model \u003d cur.model\n      AND p2.storage \u003d cur.storage\n      AND p2."
+      }, {
+        "text": "grade_code \u003d cur.grade_code\n      AND p2.report_date \u003c cur.report_date"
+      }, {
+        "text": "\n)\nORDER BY cur.report_date DESC, cur.brand, cur.model;\n```"
+      }, {
+        "text": "",
+        "thoughtSignature": "ElkKVwFpFH0TU/gwyQKUI0SzZDoBwqXB/KsV76arbC6M5HJFUpAodbUfbmtLxAfzdVADWyTJ0jDMZ+gW8NOaXgQXhJTaxEPxZvu7RpPOHdc3bbLOfQQiVL2JSg=="
+      }],
+      "createTime": "2026-10-31T08:22:44.768Z"
+    }, {
+      "text": "create a report.html where i can see the comparison report\n",
+      "role": "user",
+      "tokenCount": 44,
+      "createTime": "2026-10-31T08:25:03.439Z"
+    }, {
+      "text": "To view your **Day-on-Day (DoD)**, **Week-on-Week (WoW)**, and **Month-on-Month (MoM)** comparison reports directly in the browser, you need:\n1. A helper function in `exporter.py` to read historical records from your MS Access database (`mobile_price_history.accdb`), with an automatic fallback to `output.json` if needed.\n2. Two new routes in `app.py` (`/report` to serve the HTML page and `/api/seed-demo-history` so you can optionally generate realistic historical data across past days, weeks, and months to test the comparison matrix immediately).\n3. The `templates/report.html` file featuring interactive tabs (Day-on-Day, Week-on-Week, Month-on-Month), variance calculations ($\\Delta$ ₹ and $\\Delta$ %), a Chart.js trend line chart, and CSV export.\n\n---\n\n### Step 1: Add `load_from_access()` to `exporter.py`\nAppend this function to the bottom of your `exporter.py` file so Flask can read all historical snapshots from MS Access:\n\n```python\ndef load_from_access(\n    db_path: Path \u003d OUTPUT_ACCESS_PATH,\n    table_name: str \u003d ACCESS_TABLE_NAME,\n) -\u003e List[Dict[str, Any]]:\n    \"\"\"\n    Read all historical pricing records from MS Access (.accdb) for DoD, WoW, and MoM reports.\n    \"\"\"\n    if not db_path.exists():\n        return []\n\n    try:\n        import pyodbc\n        conn_str \u003d (\n            r\"DRIVER\u003d{Microsoft Access Driver (*.mdb, *.accdb)};\"\n            f\"DBQ\u003d{str(db_path.resolve())};\"\n        )\n        conn \u003d pyodbc.connect(conn_str, autocommit\u003dTrue)\n        cursor \u003d conn.cursor()\n\n        table_exists \u003d any(\n            row.table_name.lower() \u003d\u003d table_name.lower()\n            for row in cursor.tables(tableType\u003d\"TABLE\")\n        )\n        if not table_exists:\n            cursor.close()\n            conn.close()\n            return []\n\n        cursor.execute(f\"SELECT * FROM [{table_name}] ORDER BY [scraped_at] ASC\")\n        columns \u003d [col[0] for col in cursor.description]\n        records \u003d []\n\n        for row in cursor.fetchall():\n            rec \u003d dict(zip(columns, row))\n            for dt_col in (\"scraped_at\", \"report_date\"):\n                if isinstance(rec.get(dt_col), datetime):\n                    rec[dt_col] \u003d rec[dt_col].isoformat()\n            records.append(rec)\n\n        cursor.close()\n        conn.close()\n        return records\n    except Exception as exc:\n        logger.warning(\"Could not read from MS Access (%s). Falling back to JSON.\", exc)\n        return []\n```\n\n---\n\n### Step 2: Add the `/report` Routes to `app.py`\nAdd the following routes to your `app.py` (make sure `load_from_access` and `save_to_access` are imported from `exporter`, and `OUTPUT_ACCESS_PATH` is imported from `config`):\n\n```python\nfrom datetime import timedelta\nimport random\nfrom config import OUTPUT_ACCESS_PATH\nfrom exporter import load_from_access, save_to_access\n\n\ndef load_history_records() -\u003e List[Dict[str, Any]]:\n    \"\"\"\n    Load historical records from MS Access if available, otherwise normalize records from output.json.\n    \"\"\"\n    access_records \u003d load_from_access(OUTPUT_ACCESS_PATH)\n    if access_records:\n        return access_records\n\n    # Fallback: Enrich records from output.json with report_date, report_week, report_month\n    raw_records \u003d []\n    if OUTPUT_JSON_PATH.exists():\n        with open(OUTPUT_JSON_PATH, encoding\u003d\"utf-8\") as f:\n            raw_records \u003d json.load(f)\n\n    enriched \u003d []\n    for r in raw_records:\n        ts \u003d r.get(\"timestamp\", datetime.now(timezone.utc).isoformat())\n        try:\n            dt \u003d datetime.fromisoformat(str(ts).replace(\"Z\", \"+00:00\")).astimezone().replace(tzinfo\u003dNone)\n        except ValueError:\n            dt \u003d datetime.now()\n\n        iso_yr, iso_wk, _ \u003d dt.isocalendar()\n        cond \u003d str(r.get(\"condition\", \"\"))\n        grade_code \u003d cond.split(\":\")[0].strip() if \":\" in cond else cond[:30]\n\n        item \u003d dict(r)\n        item[\"grade_code\"] \u003d grade_code\n        item[\"scraped_at\"] \u003d dt.isoformat()\n        item[\"report_date\"] \u003d dt.strftime(\"%Y-%m-%d\")\n        item[\"report_week\"] \u003d f\"{iso_yr}-W{iso_wk:02d}\"\n        item[\"report_month\"] \u003d f\"{dt.year}-{dt.month:02d}\"\n        enriched.append(item)\n\n    return enriched\n\n\n@app.route(\"/report\")\ndef comparison_report():\n    \"\"\"Serve the DoD, WoW, and MoM Price Comparison Report page.\"\"\"\n    history_records \u003d load_history_records()\n    db_connected \u003d OUTPUT_ACCESS_PATH.exists()\n    return render_template(\n        \"report.html\",\n        history_records\u003dhistory_records,\n        db_connected\u003ddb_connected,\n        db_path\u003dstr(OUTPUT_ACCESS_PATH.name),\n    )\n\n\n@app.route(\"/api/seed-demo-history\", methods\u003d[\"POST\"])\ndef api_seed_demo_history():\n    \"\"\"\n    Generate realistic historical snapshots (past days, weeks, and months) from current\n    baseline records and store them in MS Access + output_history so DoD/WoW/MoM can be tested immediately.\n    \"\"\"\n    current_records \u003d load_records()\n    if not current_records:\n        return jsonify({\"success\": False, \"error\": \"No baseline records found. Run a scrape first.\"}), 400\n\n    now \u003d datetime.now(timezone.utc)\n    # Offsets in days covering past 3 days, past 3 weeks, and past 3 months\n    day_offsets \u003d [90, 60, 30, 21, 14, 7, 3, 2, 1, 0]\n    seeded_batch: List[Dict[str, Any]] \u003d []\n\n    for idx, days_ago in enumerate(day_offsets):\n        snap_dt \u003d now - timedelta(days\u003ddays_ago)\n        # Simulate slight market depreciation over time (older prices were ~1% to 6% higher)\n        historical_factor \u003d 1.0 + (days_ago * 0.0006)\n\n        for rec in current_records:\n            clone \u003d copy.deepcopy(rec)\n            jitter \u003d random.uniform(-0.008, 0.008) if days_ago \u003e 0 else 0.0\n            base_price \u003d int(rec.get(\"buyback_price\", 0))\n            clone[\"buyback_price\"] \u003d int(round(base_price * (historical_factor + jitter), -1))\n            clone[\"timestamp\"] \u003d snap_dt.isoformat()\n            seeded_batch.append(clone)\n\n    # Save to MS Access\n    saved_access \u003d save_to_access(seeded_batch, OUTPUT_ACCESS_PATH)\n    # Also append to output.json so JSON fallback works if Access driver isn\u0027t installed\n    save_to_json(seeded_batch, OUTPUT_JSON_PATH)\n\n    return jsonify({\n        \"success\": True,\n        \"access_saved\": saved_access,\n        \"message\": f\"Seeded {len(seeded_batch)} historical records across {len(day_offsets)} time periods!\",\n    })\n```\n\n---\n\n### Step 3: Create `templates/report.html`\nCreate a file named `report.html` inside your `templates/` folder (`templates/report.html`):\n\n```html\n\u003c!DOCTYPE html\u003e\n\u003chtml lang\u003d\"en\"\u003e\n\u003chead\u003e\n  \u003cmeta charset\u003d\"UTF-8\" /\u003e\n  \u003cmeta name\u003d\"viewport\" content\u003d\"width\u003ddevice-width, initial-scale\u003d1.0\" /\u003e\n  \u003ctitle\u003eDoD / WoW / MoM Price Comparison Report — Mobile Price Intelligence\u003c/title\u003e\n  \u003cscript src\u003d\"https://cdn.tailwindcss.com\"\u003e\u003c/script\u003e\n  \u003cscript src\u003d\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"\u003e\u003c/script\u003e\n  \u003clink href\u003d\"https://fonts.googleapis.com/css2?family\u003dInter:wght@400;500;600;700\u0026display\u003dswap\" rel\u003d\"stylesheet\" /\u003e\n  \u003cstyle\u003e\n    body { font-family: \u0027Inter\u0027, sans-serif; background-color: #0f172a; color: #f8fafc; }\n    .glass-card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.15); }\n    .tab-active { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35); }\n    .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #cbd5e1; }\n    .tab-inactive:hover { background: rgba(71, 85, 105, 0.7); }\n    ::-webkit-scrollbar { width: 8px; height: 8px; }\n    ::-webkit-scrollbar-track { background: #1e293b; }\n    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }\n  \u003c/style\u003e\n\u003c/head\u003e\n\u003cbody class\u003d\"min-h-screen pb-16\"\u003e\n\n  \u003c!-- Top Navigation Header --\u003e\n  \u003cheader class\u003d\"border-b border-slate-800 bg-slate-900/90 sticky top-0 z-30 backdrop-blur\"\u003e\n    \u003cdiv class\u003d\"max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4\"\u003e\n      \u003cdiv class\u003d\"flex items-center gap-3\"\u003e\n        \u003cdiv class\u003d\"h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold text-lg\"\u003e\n          📊\n        \u003c/div\u003e\n        \u003cdiv\u003e\n          \u003ch1 class\u003d\"text-lg sm:text-xl font-bold text-white tracking-tight\"\u003e\n            Historical Price Comparison Report (DoD / WoW / MoM)\n          \u003c/h1\u003e\n          \u003cp class\u003d\"text-xs text-slate-400 flex items-center gap-2\"\u003e\n            \u003cspan\u003eSource: \u003cstrong\u003e{{ db_path }}\u003c/strong\u003e\u003c/span\u003e\n            {% if db_connected %}\n              \u003cspan class\u003d\"inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30\"\u003e\n                ● MS Access Connected\n              \u003c/span\u003e\n            {% else %}\n              \u003cspan class\u003d\"inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30\"\u003e\n                ● Using JSON Snapshot Fallback\n              \u003c/span\u003e\n            {% endif %}\n          \u003c/p\u003e\n        \u003c/div\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"flex items-center gap-2.5\"\u003e\n        \u003ca href\u003d\"/\" class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition\"\u003e\n          ← Back to Live Scraper\n        \u003c/a\u003e\n        \u003cbutton id\u003d\"btnSeedHistory\" onclick\u003d\"seedDemoHistory()\" class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-indigo-600/90 hover:bg-indigo-500 text-white border border-indigo-400/30 transition\"\u003e\n          ⚡ Generate Sample Historical Data\n        \u003c/button\u003e\n        \u003cbutton onclick\u003d\"exportComparisonCSV()\" class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-emerald-600/90 hover:bg-emerald-500 text-white border border-emerald-400/30 transition\"\u003e\n          ⬇ Export Matrix CSV\n        \u003c/button\u003e\n        {% if db_connected %}\n        \u003ca href\u003d\"/download/access\" class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-blue-600/90 hover:bg-blue-500 text-white border border-blue-400/30 transition\"\u003e\n          🗄 Download .accdb\n        \u003c/a\u003e\n        {% endif %}\n      \u003c/div\u003e\n    \u003c/div\u003e\n  \u003c/header\u003e\n\n  \u003cmain class\u003d\"max-w-7xl mx-auto px-4 sm:px-6 mt-6 space-y-6\"\u003e\n\n    \u003c!-- Control Bar: Period Mode + Filters --\u003e\n    \u003csection class\u003d\"glass-card rounded-2xl p-5\"\u003e\n      \u003cdiv class\u003d\"flex flex-col lg:flex-row lg:items-center justify-between gap-4\"\u003e\n\n        \u003c!-- Period Granularity Tabs --\u003e\n        \u003cdiv\u003e\n          \u003clabel class\u003d\"block text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2\"\u003e\n            Comparison Timeframe\n          \u003c/label\u003e\n          \u003cdiv class\u003d\"inline-flex rounded-xl p-1 bg-slate-900/90 border border-slate-800 gap-1\"\u003e\n            \u003cbutton id\u003d\"tab-day\" onclick\u003d\"setGranularity(\u0027day\u0027)\" class\u003d\"px-4 py-2 rounded-lg text-xs font-semibold transition tab-active\"\u003e\n              📅 Day-on-Day (DoD)\n            \u003c/button\u003e\n            \u003cbutton id\u003d\"tab-week\" onclick\u003d\"setGranularity(\u0027week\u0027)\" class\u003d\"px-4 py-2 rounded-lg text-xs font-semibold transition tab-inactive\"\u003e\n              📆 Week-on-Week (WoW)\n            \u003c/button\u003e\n            \u003cbutton id\u003d\"tab-month\" onclick\u003d\"setGranularity(\u0027month\u0027)\" class\u003d\"px-4 py-2 rounded-lg text-xs font-semibold transition tab-inactive\"\u003e\n              🗓 Month-on-Month (MoM)\n            \u003c/button\u003e\n          \u003c/div\u003e\n        \u003c/div\u003e\n\n        \u003c!-- Filters --\u003e\n        \u003cdiv class\u003d\"grid grid-cols-1 sm:grid-cols-4 gap-3 flex-1 max-w-3xl\"\u003e\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eSearch Model\u003c/label\u003e\n            \u003cinput id\u003d\"filterSearch\" type\u003d\"text\" oninput\u003d\"renderReport()\" placeholder\u003d\"e.g. iPhone 13, S23...\"\n              class\u003d\"w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500\" /\u003e\n          \u003c/div\u003e\n\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eBrand\u003c/label\u003e\n            \u003cselect id\u003d\"filterBrand\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"ALL\"\u003eAll Brands\u003c/option\u003e\n              \u003coption value\u003d\"Apple\"\u003eApple\u003c/option\u003e\n              \u003coption value\u003d\"Samsung\"\u003eSamsung\u003c/option\u003e\n            \u003c/select\u003e\n          \u003c/div\u003e\n\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eCondition Grade\u003c/label\u003e\n            \u003cselect id\u003d\"filterGrade\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"Grade A\" selected\u003eGrade A (Verified Baseline)\u003c/option\u003e\n              \u003coption value\u003d\"Grade B\"\u003eGrade B (Good)\u003c/option\u003e\n              \u003coption value\u003d\"Grade C\"\u003eGrade C (Fair)\u003c/option\u003e\n              \u003coption value\u003d\"Grade D\"\u003eGrade D (Defective)\u003c/option\u003e\n              \u003coption value\u003d\"ALL\"\u003eAll Condition Grades\u003c/option\u003e\n            \u003c/select\u003e\n          \u003c/div\u003e\n\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eStorage\u003c/label\u003e\n            \u003cselect id\u003d\"filterStorage\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"ALL\"\u003eAll Capacities\u003c/option\u003e\n              \u003coption value\u003d\"64 GB\"\u003e64 GB\u003c/option\u003e\n              \u003coption value\u003d\"128 GB\"\u003e128 GB\u003c/option\u003e\n              \u003coption value\u003d\"256 GB\"\u003e256 GB\u003c/option\u003e\n              \u003coption value\u003d\"512 GB\"\u003e512 GB\u003c/option\u003e\n            \u003c/select\u003e\n          \u003c/div\u003e\n        \u003c/div\u003e\n\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Summary KPI Cards --\u003e\n    \u003csection class\u003d\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4\"\u003e\n      \u003cdiv class\u003d\"glass-card rounded-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eTracked Period Buckets\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiPeriods\" class\u003d\"text-2xl font-bold text-white mt-1\"\u003e0\u003c/div\u003e\n        \u003cspan id\u003d\"kpiPeriodRange\" class\u003d\"text-[11px] text-slate-400\"\u003e—\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eLatest Avg Buyback Price\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiLatestAvg\" class\u003d\"text-2xl font-bold text-blue-400 mt-1\"\u003e₹0\u003c/div\u003e\n        \u003cspan class\u003d\"text-[11px] text-slate-400\"\u003eAcross filtered devices\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eAvg Period-over-Period Change\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiAvgDelta\" class\u003d\"text-2xl font-bold text-emerald-400 mt-1\"\u003e0.0%\u003c/div\u003e\n        \u003cspan id\u003d\"kpiDeltaLabel\" class\u003d\"text-[11px] text-slate-400\"\u003eLatest vs Previous Period\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eBiggest Price Mover\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiTopMover\" class\u003d\"text-base font-bold text-amber-300 mt-1 truncate\"\u003eN/A\u003c/div\u003e\n        \u003cspan id\u003d\"kpiTopMoverSub\" class\u003d\"text-[11px] text-slate-400\"\u003e—\u003c/span\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Historical Trend Line Chart --\u003e\n    \u003csection class\u003d\"glass-card rounded-2xl p-5\"\u003e\n      \u003cdiv class\u003d\"flex items-center justify-between mb-4\"\u003e\n        \u003cdiv\u003e\n          \u003ch2 class\u003d\"text-sm font-bold text-white uppercase tracking-wider\" id\u003d\"chartTitle\"\u003e\n            Historical Price Trend\n          \u003c/h2\u003e\n          \u003cp class\u003d\"text-xs text-slate-400\"\u003e\n            Visualizes buyback price movements across selected time buckets (top 6 matching variants)\n          \u003c/p\u003e\n        \u003c/div\u003e\n      \u003c/div\u003e\n      \u003cdiv class\u003d\"h-72 w-full\"\u003e\n        \u003ccanvas id\u003d\"trendChart\"\u003e\u003c/canvas\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Crosstab Comparison Matrix Table --\u003e\n    \u003csection class\u003d\"glass-card rounded-2xl overflow-hidden\"\u003e\n      \u003cdiv class\u003d\"px-5 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2\"\u003e\n        \u003cdiv\u003e\n          \u003ch2 class\u003d\"text-sm font-bold text-white uppercase tracking-wider\" id\u003d\"matrixTitle\"\u003e\n            Day-on-Day (DoD) Price Comparison Matrix\n          \u003c/h2\u003e\n          \u003cp class\u003d\"text-xs text-slate-400\"\u003e\n            Compares each period\u0027s average buyback quote and highlights Latest vs. Previous variance (Δ ₹ and Δ %)\n          \u003c/p\u003e\n        \u003c/div\u003e\n        \u003cspan id\u003d\"rowCountBadge\" class\u003d\"px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300\"\u003e\n          0 variants\n        \u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"overflow-x-auto\"\u003e\n        \u003ctable class\u003d\"w-full text-left border-collapse\"\u003e\n          \u003cthead id\u003d\"matrixThead\" class\u003d\"bg-slate-900/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800\"\u003e\n          \u003c/thead\u003e\n          \u003ctbody id\u003d\"matrixTbody\" class\u003d\"divide-y divide-slate-800/70 text-xs\"\u003e\n          \u003c/tbody\u003e\n        \u003c/table\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n  \u003c/main\u003e\n\n  \u003cscript\u003e\n    // Injected historical records from Flask backend\n    const RAW_HISTORY \u003d {{ history_records | tojson | safe }};\n    let currentGranularity \u003d \u0027day\u0027; // \u0027day\u0027 | \u0027week\u0027 | \u0027month\u0027\n    let trendChartInstance \u003d null;\n    let latestExportRows \u003d [];\n\n    function getBucketKey(record, mode) {\n      const rawTs \u003d record.scraped_at || record.timestamp || \u0027\u0027;\n      const d \u003d rawTs ? new Date(rawTs) : new Date();\n      if (isNaN(d.getTime())) return \u0027Unknown\u0027;\n\n      if (mode \u003d\u003d\u003d \u0027day\u0027) {\n        if (record.report_date \u0026\u0026 record.report_date.length \u003e\u003d 10) {\n          return record.report_date.substring(0, 10);\n        }\n        return d.toISOString().substring(0, 10);\n      }\n\n      if (mode \u003d\u003d\u003d \u0027week\u0027) {\n        if (record.report_week) return record.report_week;\n        // Compute ISO week\n        const temp \u003d new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));\n        const dayNum \u003d temp.getUTCDay() || 7;\n        temp.setUTCDate(temp.getUTCDate() + 4 - dayNum);\n        const yearStart \u003d new Date(Date.UTC(temp.getUTCFullYear(), 0, 1));\n        const weekNo \u003d Math.ceil((((temp - yearStart) / 86400000) + 1) / 7);\n        return `${temp.getUTCFullYear()}-W${String(weekNo).padStart(2, \u00270\u0027)}`;\n      }\n\n      if (mode \u003d\u003d\u003d \u0027month\u0027) {\n        if (record.report_month) return record.report_month;\n        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, \u00270\u0027)}`;\n      }\n      return \u0027Unknown\u0027;\n    }\n\n    function getGradeShort(record) {\n      const g \u003d record.grade_code || record.condition || \u0027\u0027;\n      if (g.includes(\u0027Grade A\u0027)) return \u0027Grade A\u0027;\n      if (g.includes(\u0027Grade B\u0027)) return \u0027Grade B\u0027;\n      if (g.includes(\u0027Grade C\u0027)) return \u0027Grade C\u0027;\n      if (g.includes(\u0027Grade D\u0027)) return \u0027Grade D\u0027;\n      return g.split(\u0027:\u0027)[0].trim() || \u0027Grade A\u0027;\n    }\n\n    function setGranularity(mode) {\n      currentGranularity \u003d mode;\n      [\u0027day\u0027, \u0027week\u0027, \u0027month\u0027].forEach(m \u003d\u003e {\n        const btn \u003d document.getElementById(`tab-${m}`);\n        btn.className \u003d (m \u003d\u003d\u003d mode)\n          ? \u0027px-4 py-2 rounded-lg text-xs font-semibold transition tab-active\u0027\n          : \u0027px-4 py-2 rounded-lg text-xs font-semibold transition tab-inactive\u0027;\n      });\n\n      const titles \u003d {\n        day: \u0027Day-on-Day (DoD) Price Comparison Matrix\u0027,\n        week: \u0027Week-on-Week (WoW) Price Comparison Matrix\u0027,\n        month: \u0027Month-on-Month (MoM) Price Comparison Matrix\u0027\n      };\n      document.getElementById(\u0027matrixTitle\u0027).textContent \u003d titles[mode];\n      renderReport();\n    }\n\n    function formatINR(val) {\n      if (val \u003d\u003d\u003d null || val \u003d\u003d\u003d undefined || isNaN(val)) return \u0027—\u0027;\n      return \u0027₹\u0027 + Math.round(val).toLocaleString(\u0027en-IN\u0027);\n    }\n\n    function renderReport() {\n      const searchVal \u003d document.getElementById(\u0027filterSearch\u0027).value.trim().toLowerCase();\n      const brandVal \u003d document.getElementById(\u0027filterBrand\u0027).value;\n      const gradeVal \u003d document.getElementById(\u0027filterGrade\u0027).value;\n      const storageVal \u003d document.getElementById(\u0027filterStorage\u0027).value;\n\n      // 1. Filter records\n      const filtered \u003d RAW_HISTORY.filter(r \u003d\u003e {\n        const brand \u003d (r.brand || \u0027\u0027).trim();\n        const model \u003d (r.model || \u0027\u0027).toLowerCase();\n        const storage \u003d (r.storage || \u0027\u0027).trim();\n        const grade \u003d getGradeShort(r);\n\n        if (brandVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 brand.toLowerCase() !\u003d\u003d brandVal.toLowerCase()) return false;\n        if (gradeVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 grade !\u003d\u003d gradeVal) return false;\n        if (storageVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 storage.toUpperCase() !\u003d\u003d storageVal.toUpperCase()) return false;\n        if (searchVal \u0026\u0026 !model.includes(searchVal) \u0026\u0026 !brand.toLowerCase().includes(searchVal)) return false;\n        return true;\n      });\n\n      // 2. Collect sorted unique period buckets\n      const periodSet \u003d new Set();\n      const deviceGroups \u003d {};\n\n      filtered.forEach(r \u003d\u003e {\n        const period \u003d getBucketKey(r, currentGranularity);\n        periodSet.add(period);\n\n        const grade \u003d getGradeShort(r);\n        const key \u003d `${r.brand}||${r.model}||${r.storage}||${grade}`;\n        if (!deviceGroups[key]) {\n          deviceGroups[key] \u003d {\n            brand: r.brand,\n            model: r.model,\n            storage: r.storage,\n            grade: grade,\n            buckets: {}\n          };\n        }\n        if (!deviceGroups[key].buckets[period]) {\n          deviceGroups[key].buckets[period] \u003d [];\n        }\n        deviceGroups[key].buckets[period].push(Number(r.buyback_price) || 0);\n      });\n\n      const periods \u003d Array.from(periodSet).sort();\n      const displayPeriods \u003d periods.slice(-8); // Show up to last 8 periods cleanly\n\n      // 3. Build table header\n      const thead \u003d document.getElementById(\u0027matrixThead\u0027);\n      let headHTML \u003d `\u003ctr\u003e\n        \u003cth class\u003d\"py-3.5 px-4\"\u003eBrand\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-4\"\u003eModel\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-3\"\u003eStorage\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-3\"\u003eGrade\u003c/th\u003e`;\n\n      displayPeriods.forEach(p \u003d\u003e {\n        headHTML +\u003d `\u003cth class\u003d\"py-3.5 px-3 text-right font-semibold text-slate-300\"\u003e${p}\u003c/th\u003e`;\n      });\n\n      headHTML +\u003d `\n        \u003cth class\u003d\"py-3.5 px-4 text-right text-blue-300\"\u003eΔ Price (INR)\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-4 text-right text-blue-300\"\u003eΔ Change (%)\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-4 text-right text-slate-300\"\u003eOverall Δ (First→Last)\u003c/th\u003e\n      \u003c/tr\u003e`;\n      thead.innerHTML \u003d headHTML;\n\n      // 4. Build rows \u0026 compute KPIs\n      const tbody \u003d document.getElementById(\u0027matrixTbody\u0027);\n      const rows \u003d Object.values(deviceGroups).sort((a, b) \u003d\u003e a.model.localeCompare(b.model));\n      document.getElementById(\u0027rowCountBadge\u0027).textContent \u003d `${rows.length} variants`;\n\n      let latestPrices \u003d [];\n      let popChangesPct \u003d [];\n      let topMover \u003d { name: \u0027N/A\u0027, pct: 0, diff: 0 };\n      latestExportRows \u003d [];\n\n      if (rows.length \u003d\u003d\u003d 0) {\n        tbody.innerHTML \u003d `\u003ctr\u003e\n          \u003ctd colspan\u003d\"${displayPeriods.length + 7}\" class\u003d\"py-12 text-center text-slate-400\"\u003e\n            No matching historical records found. Click \u003cstrong\u003e\"⚡ Generate Sample Historical Data\"\u003c/strong\u003e above or run a scrape first.\n          \u003c/td\u003e\n        \u003c/tr\u003e`;\n      } else {\n        let bodyHTML \u003d \u0027\u0027;\n\n        rows.forEach(item \u003d\u003e {\n          // Compute average per period\n          const avgByPeriod \u003d {};\n          displayPeriods.forEach(p \u003d\u003e {\n            const arr \u003d item.buckets[p];\n            if (arr \u0026\u0026 arr.length \u003e 0) {\n              avgByPeriod[p] \u003d arr.reduce((a, b) \u003d\u003e a + b, 0) / arr.length;\n            } else {\n              avgByPeriod[p] \u003d null;\n            }\n          });\n\n          // Find non-null periods for this row\n          const validPeriods \u003d displayPeriods.filter(p \u003d\u003e avgByPeriod[p] !\u003d\u003d null);\n          const latestVal \u003d validPeriods.length \u003e\u003d 1 ? avgByPeriod[validPeriods[validPeriods.length - 1]] : null;\n          const prevVal \u003d validPeriods.length \u003e\u003d 2 ? avgByPeriod[validPeriods[validPeriods.length - 2]] : null;\n          const firstVal \u003d validPeriods.length \u003e\u003d 2 ? avgByPeriod[validPeriods[0]] : null;\n\n          if (latestVal !\u003d\u003d null) latestPrices.push(latestVal);\n\n          let diffINR \u003d null;\n          let diffPct \u003d null;\n          if (latestVal !\u003d\u003d null \u0026\u0026 prevVal !\u003d\u003d null \u0026\u0026 prevVal \u003e 0) {\n            diffINR \u003d latestVal - prevVal;\n            diffPct \u003d (diffINR / prevVal) * 100;\n            popChangesPct.push(diffPct);\n\n            if (Math.abs(diffPct) \u003e Math.abs(topMover.pct)) {\n              topMover \u003d { name: `${item.model}`, pct: diffPct, diff: diffINR };\n            }\n          }\n\n          let overallDiffINR \u003d (latestVal !\u003d\u003d null \u0026\u0026 firstVal !\u003d\u003d null) ? (latestVal - firstVal) : null;\n          let overallPct \u003d (overallDiffINR !\u003d\u003d null \u0026\u0026 firstVal \u003e 0) ? ((overallDiffINR / firstVal) * 100) : null;\n\n          // Prepare export row\n          const expObj \u003d {\n            Brand: item.brand,\n            Model: item.model,\n            Storage: item.storage,\n            Grade: item.grade\n          };\n          displayPeriods.forEach(p \u003d\u003e {\n            expObj[p] \u003d avgByPeriod[p] !\u003d\u003d null ? Math.round(avgByPeriod[p]) : \u0027\u0027;\n          });\n          expObj[\u0027Delta_INR\u0027] \u003d diffINR !\u003d\u003d null ? Math.round(diffINR) : \u0027\u0027;\n          expObj[\u0027Delta_Pct\u0027] \u003d diffPct !\u003d\u003d null ? diffPct.toFixed(2) + \u0027%\u0027 : \u0027\u0027;\n          latestExportRows.push(expObj);\n\n          // Format badge styling\n          let deltaBadge \u003d \u0027\u003cspan class\u003d\"text-slate-500\"\u003e—\u003c/span\u003e\u0027;\n          let pctBadge \u003d \u0027\u003cspan class\u003d\"text-slate-500\"\u003e—\u003c/span\u003e\u0027;\n          if (diffINR !\u003d\u003d null) {\n            const sign \u003d diffINR \u003e 0 ? \u0027+\u0027 : \u0027\u0027;\n            const cls \u003d diffINR \u003e 0\n              ? \u0027text-emerald-400 font-semibold\u0027\n              : (diffINR \u003c 0 ? \u0027text-rose-400 font-semibold\u0027 : \u0027text-slate-400\u0027);\n            deltaBadge \u003d `\u003cspan class\u003d\"${cls}\"\u003e${sign}${formatINR(diffINR)}\u003c/span\u003e`;\n            pctBadge \u003d `\u003cspan class\u003d\"px-2 py-0.5 rounded text-[11px] ${\n              diffINR \u003e 0 ? \u0027bg-emerald-500/15 text-emerald-300\u0027 :\n              diffINR \u003c 0 ? \u0027bg-rose-500/15 text-rose-300\u0027 : \u0027bg-slate-800 text-slate-400\u0027\n            }\"\u003e${sign}${diffPct.toFixed(2)}%\u003c/span\u003e`;\n          }\n\n          let overallBadge \u003d \u0027\u003cspan class\u003d\"text-slate-500\"\u003e—\u003c/span\u003e\u0027;\n          if (overallDiffINR !\u003d\u003d null) {\n            const sign \u003d overallDiffINR \u003e 0 ? \u0027+\u0027 : \u0027\u0027;\n            const cls \u003d overallDiffINR \u003e 0 ? \u0027text-emerald-400\u0027 : (overallDiffINR \u003c 0 ? \u0027text-rose-400\u0027 : \u0027text-slate-400\u0027);\n            overallBadge \u003d `\u003cspan class\u003d\"${cls}\"\u003e${sign}${formatINR(overallDiffINR)} (${sign}${overallPct.toFixed(1)}%)\u003c/span\u003e`;\n          }\n\n          bodyHTML +\u003d `\u003ctr class\u003d\"hover:bg-slate-800/40 transition\"\u003e\n            \u003ctd class\u003d\"py-3 px-4 font-medium text-slate-300\"\u003e${item.brand}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-4 font-semibold text-white\"\u003e${item.model}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-3 text-slate-300\"\u003e${item.storage}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-3\"\u003e\n              \u003cspan class\u003d\"px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300 border border-slate-700\"\u003e${item.grade}\u003c/span\u003e\n            \u003c/td\u003e`;\n\n          displayPeriods.forEach(p \u003d\u003e {\n            const v \u003d avgByPeriod[p];\n            bodyHTML +\u003d `\u003ctd class\u003d\"py-3 px-3 text-right font-mono ${v !\u003d\u003d null ? \u0027text-slate-200\u0027 : \u0027text-slate-600\u0027}\"\u003e\n              ${v !\u003d\u003d null ? formatINR(v) : \u0027—\u0027}\n            \u003c/td\u003e`;\n          });\n\n          bodyHTML +\u003d `\n            \u003ctd class\u003d\"py-3 px-4 text-right font-mono\"\u003e${deltaBadge}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-4 text-right font-mono\"\u003e${pctBadge}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-4 text-right font-mono text-[11px]\"\u003e${overallBadge}\u003c/td\u003e\n          \u003c/tr\u003e`;\n        });\n\n        tbody.innerHTML \u003d bodyHTML;\n      }\n\n      // 5. Update KPI summary cards\n      document.getElementById(\u0027kpiPeriods\u0027).textContent \u003d displayPeriods.length;\n      document.getElementById(\u0027kpiPeriodRange\u0027).textContent \u003d displayPeriods.length \u003e 0\n        ? `${displayPeriods[0]} → ${displayPeriods[displayPeriods.length - 1]}`\n        : \u0027No time buckets\u0027;\n\n      const avgLatest \u003d latestPrices.length \u003e 0\n        ? latestPrices.reduce((a, b) \u003d\u003e a + b, 0) / latestPrices.length\n        : 0;\n      document.getElementById(\u0027kpiLatestAvg\u0027).textContent \u003d formatINR(avgLatest);\n\n      const avgPop \u003d popChangesPct.length \u003e 0\n        ? popChangesPct.reduce((a, b) \u003d\u003e a + b, 0) / popChangesPct.length\n        : 0;\n      const deltaEl \u003d document.getElementById(\u0027kpiAvgDelta\u0027);\n      deltaEl.textContent \u003d `${avgPop \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${avgPop.toFixed(2)}%`;\n      deltaEl.className \u003d `text-2xl font-bold mt-1 ${\n        avgPop \u003e 0 ? \u0027text-emerald-400\u0027 : (avgPop \u003c 0 ? \u0027text-rose-400\u0027 : \u0027text-slate-300\u0027)\n      }`;\n\n      document.getElementById(\u0027kpiTopMover\u0027).textContent \u003d topMover.name;\n      document.getElementById(\u0027kpiTopMoverSub\u0027).textContent \u003d topMover.name !\u003d\u003d \u0027N/A\u0027\n        ? `${topMover.diff \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${formatINR(topMover.diff)} (${topMover.pct \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${topMover.pct.toFixed(2)}%)`\n        : \u0027Need at least 2 time periods\u0027;\n\n      // 6. Update Chart.js visualization\n      updateTrendChart(displayPeriods, rows.slice(0, 6));\n    }\n\n    function updateTrendChart(periods, topRows) {\n      const ctx \u003d document.getElementById(\u0027trendChart\u0027).getContext(\u00272d\u0027);\n      if (trendChartInstance) {\n        trendChartInstance.destroy();\n      }\n\n      const palette \u003d [\u0027#3b82f6\u0027, \u0027#10b981\u0027, \u0027#f59e0b\u0027, \u0027#ec4899\u0027, \u0027#8b5cf6\u0027, \u0027#06b6d4\u0027];\n      const datasets \u003d topRows.map((row, idx) \u003d\u003e {\n        const dataPts \u003d periods.map(p \u003d\u003e {\n          const arr \u003d row.buckets[p];\n          return (arr \u0026\u0026 arr.length \u003e 0)\n            ? Math.round(arr.reduce((a, b) \u003d\u003e a + b, 0) / arr.length)\n            : null;\n        });\n\n        return {\n          label: `${row.model} (${row.grade})`,\n          data: dataPts,\n          borderColor: palette[idx % palette.length],\n          backgroundColor: palette[idx % palette.length] + \u002733\u0027,\n          borderWidth: 2.5,\n          tension: 0.3,\n          spanGaps: true,\n          pointRadius: 4\n        };\n      });\n\n      trendChartInstance \u003d new Chart(ctx, {\n        type: \u0027line\u0027,\n        data: { labels: periods, datasets },\n        options: {\n          responsive: true,\n          maintainAspectRatio: false,\n          interaction: { mode: \u0027index\u0027, intersect: false },\n          plugins: {\n            legend: {\n              labels: { color: \u0027#cbd5e1\u0027, font: { size: 11 } }\n            },\n            tooltip: {\n              callbacks: {\n                label: (ctx) \u003d\u003e `${ctx.dataset.label}: ₹${(ctx.parsed.y || 0).toLocaleString(\u0027en-IN\u0027)}`\n              }\n            }\n          },\n          scales: {\n            x: {\n              ticks: { color: \u0027#94a3b8\u0027, font: { size: 11 } },\n              grid: { color: \u0027rgba(148, 163, 184, 0.08)\u0027 }\n            },\n            y: {\n              ticks: {\n                color: \u0027#94a3b8\u0027,\n                font: { size: 11 },\n                callback: (v) \u003d\u003e \u0027₹\u0027 + v.toLocaleString(\u0027en-IN\u0027)\n              },\n              grid: { color: \u0027rgba(148, 163, 184, 0.08)\u0027 }\n            }\n          }\n        }\n      });\n    }\n\n    async function seedDemoHistory() {\n      const btn \u003d document.getElementById(\u0027btnSeedHistory\u0027);\n      const origText \u003d btn.innerHTML;\n      btn.disabled \u003d true;\n      btn.innerHTML \u003d \u0027⏳ Seeding History...\u0027;\n\n      try {\n        const res \u003d await fetch(\u0027/api/seed-demo-history\u0027, { method: \u0027POST\u0027 });\n        const data \u003d await res.json();\n        if (data.success) {\n          window.location.reload();\n        } else {\n          alert(data.error || \u0027Failed to seed history\u0027);\n          btn.disabled \u003d false;\n          btn.innerHTML \u003d origText;\n        }\n      } catch (err) {\n        alert(\u0027Error seeding history: \u0027 + err);\n        btn.disabled \u003d false;\n        btn.innerHTML \u003d origText;\n      }\n    }\n\n    function exportComparisonCSV() {\n      if (!latestExportRows.length) {\n        alert(\u0027No rows to export.\u0027);\n        return;\n      }\n      const headers \u003d Object.keys(latestExportRows[0]);\n      const csvLines \u003d [\n        headers.join(\u0027,\u0027),\n        ...latestExportRows.map(row \u003d\u003e\n          headers.map(h \u003d\u003e `\"${String(row[h] ?? \u0027\u0027).replace(/\"/g, \u0027\"\"\u0027)}\"`).join(\u0027,\u0027)\n        )\n      ];\n      const blob \u003d new Blob([csvLines.join(\u0027\\n\u0027)], { type: \u0027text/csv;charset\u003dutf-8;\u0027 });\n      const url \u003d URL.createObjectURL(blob);\n      const a \u003d document.createElement(\u0027a\u0027);\n      a.href \u003d url;\n      a.download \u003d `price_comparison_${currentGranularity}_${new Date().toISOString().slice(0,10)}.csv`;\n      a.click();\n      URL.revokeObjectURL(url);\n    }\n\n    // Initialize on load\n    document.addEventListener(\u0027DOMContentLoaded\u0027, () \u003d\u003e {\n      renderReport();\n    });\n  \u003c/script\u003e\n\u003c/body\u003e\n\u003c/html\u003e\n```\n\n---\n\n### Step 4: How to Access \u0026 Use the Comparison Report\n1. Start your Flask web server:\n   ```powershell\n   python app.py\n   ```\n2. Open **`http://127.0.0.1:5000/report`** in your browser (you can also add a link `\u003ca href\u003d\"/report\"\u003e📊 Historical Comparison Report\u003c/a\u003e` to your main `templates/index.html` navbar).\n3. If you have only scraped once today and want to immediately test how **Day-on-Day**, **Week-on-Week**, and **Month-on-Month** comparisons look, click the **\"⚡ Generate Sample Historical Data\"** button in the top-right bar. It will populate historical snapshots (1, 2, 3 days ago; 1, 2, 3 weeks ago; 1, 2, 3 months ago) into your MS Access database (`mobile_price_history.accdb`) and reload the matrix.",
+      "role": "model",
+      "finishReason": "STOP",
+      "tokenCount": 10057,
+      "parts": [{
+        "text": "To"
+      }, {
+        "text": " view your **Day-on-Day (DoD)**, **Week-on-Week ("
+      }, {
+        "text": "WoW)**, and **Month-on-Month (MoM)** comparison reports directly in the browser, you need"
+      }, {
+        "text": ":\n1. A helper function in `exporter.py` to read historical records from your MS Access database (`mobile_price_history.accdb"
+      }, {
+        "text": "`), with an automatic fallback to `output.json` if needed.\n2. Two new routes in `app.py"
+      }, {
+        "text": "` (`/report` to serve the HTML page and `/api/seed-demo-history` so you can optionally generate realistic historical data across"
+      }, {
+        "text": " past days, weeks, and months to test the comparison matrix immediately).\n3. The `templates/report.html` file"
+      }, {
+        "text": " featuring interactive tabs (Day-on-Day, Week-on-Week, Month-on-Month), variance calculations"
+      }, {
+        "text": " ($\\Delta$ ₹ and $\\Delta$ %), a Chart.js trend line chart, and CSV export.\n\n---\n\n### Step"
+      }, {
+        "text": " 1: Add `load_from_access()` to `exporter.py`\nAppend this function to the bottom of your"
+      }, {
+        "text": " `exporter.py` file so Flask can read all historical snapshots from MS Access:\n\n```python\ndef load_from_access"
+      }, {
+        "text": "(\n    db_path: Path \u003d OUTPUT_ACCESS_PATH,\n    table_name: str \u003d ACCESS_TABLE_NAME,\n)"
+      }, {
+        "text": " -\u003e List[Dict[str, Any]]:\n    \"\"\"\n    Read all historical pricing records from MS Access (.accdb)"
+      }, {
+        "text": " for DoD, WoW, and MoM reports.\n    \"\"\"\n    if not db_path.exists():\n"
+      }, {
+        "text": "        return []\n\n    try:\n        import pyodbc\n        conn_str \u003d (\n            r\"DRIVER"
+      }, {
+        "text": "\u003d{Microsoft Access Driver (*.mdb, *.accdb)};\"\n            f\"DBQ\u003d{str(db_path"
+      }, {
+        "text": ".resolve())};\"\n        )\n        conn \u003d pyodbc.connect(conn_str, autocommit\u003d"
+      }, {
+        "text": "True)\n        cursor \u003d conn.cursor()\n\n        table_exists \u003d any(\n            row.table_name.lower() \u003d\u003d"
+      }, {
+        "text": " table_name.lower()\n            for row in cursor.tables(tableType\u003d\"TABLE\")\n        )\n"
+      }, {
+        "text": "        if not table_exists:\n            cursor.close()\n            conn.close()\n            return []\n\n        cursor"
+      }, {
+        "text": ".execute(f\"SELECT * FROM [{table_name}] ORDER BY [scraped_at] ASC\")\n        columns \u003d [col"
+      }, {
+        "text": "[0] for col in cursor.description]\n        records \u003d []\n\n        for row in cursor.fetchall():"
+      }, {
+        "text": "\n            rec \u003d dict(zip(columns, row))\n            for dt_col in (\"scraped_at\","
+      }, {
+        "text": " \"report_date\"):\n                if isinstance(rec.get(dt_col), datetime):\n                    rec["
+      }, {
+        "text": "dt_col] \u003d rec[dt_col].isoformat()\n            records.append(rec)\n\n        cursor.close()\n"
+      }, {
+        "text": "        conn.close()\n        return records\n    except Exception as exc:\n        logger.warning(\"Could not"
+      }, {
+        "text": " read from MS Access (%s). Falling back to JSON.\", exc)\n        return []\n```\n\n---\n\n### Step 2:"
+      }, {
+        "text": " Add the `/report` Routes to `app.py`\nAdd the following routes to your `app.py` ("
+      }, {
+        "text": "make sure `load_from_access` and `save_to_access` are imported from `exporter`, and `OUTPUT_ACCESS_PATH"
+      }, {
+        "text": "` is imported from `config`):\n\n```python\nfrom datetime import timedelta\nimport random\nfrom config import OUTPUT_ACCESS_PATH\nfrom exporter import"
+      }, {
+        "text": " load_from_access, save_to_access\n\n\ndef load_history_records() -\u003e List[Dict["
+      }, {
+        "text": "str, Any]]:\n    \"\"\"\n    Load historical records from MS Access if available, otherwise normalize records from output."
+      }, {
+        "text": "json.\n    \"\"\"\n    access_records \u003d load_from_access(OUTPUT_ACCESS_PATH)\n    if access_records:"
+      }, {
+        "text": "\n        return access_records\n\n    # Fallback: Enrich records from output.json with report_date, report_week, report"
+      }, {
+        "text": "_month\n    raw_records \u003d []\n    if OUTPUT_JSON_PATH.exists():\n        with open"
+      }, {
+        "text": "(OUTPUT_JSON_PATH, encoding\u003d\"utf-8\") as f:\n            raw_records \u003d json.load(f)\n\n    "
+      }, {
+        "text": "enriched \u003d []\n    for r in raw_records:\n        ts \u003d r.get(\"timestamp\", datetime."
+      }, {
+        "text": "now(timezone.utc).isoformat())\n        try:\n            dt \u003d datetime.fromisoformat(str(ts"
+      }, {
+        "text": ").replace(\"Z\", \"+00:00\")).astimezone().replace(tzinfo\u003dNone)\n        except Value"
+      }, {
+        "text": "Error:\n            dt \u003d datetime.now()\n\n        iso_yr, iso_wk, _ \u003d dt.isocalendar"
+      }, {
+        "text": "()\n        cond \u003d str(r.get(\"condition\", \"\"))\n        grade_code \u003d cond.split(\":\")[0].strip() if \":\""
+      }, {
+        "text": " in cond else cond[:30]\n\n        item \u003d dict(r)\n        item[\"grade_code\"] \u003d grade_"
+      }, {
+        "text": "code\n        item[\"scraped_at\"] \u003d dt.isoformat()\n        item[\"report_date\"] \u003d dt"
+      }, {
+        "text": ".strftime(\"%Y-%m-%d\")\n        item[\"report_week\"] \u003d f\"{iso_yr}-W{iso_wk"
+      }, {
+        "text": ":02d}\"\n        item[\"report_month\"] \u003d f\"{dt.year}-{dt.month:"
+      }, {
+        "text": "02d}\"\n        enriched.append(item)\n\n    return enriched\n\n\n@app.route(\"/report\")"
+      }, {
+        "text": "\ndef comparison_report():\n    \"\"\"Serve the DoD, WoW, and MoM Price Comparison Report page.\"\"\"\n    history"
+      }, {
+        "text": "_records \u003d load_history_records()\n    db_connected \u003d OUTPUT_ACCESS_PATH.exists()\n    return render_template("
+      }, {
+        "text": "\n        \"report.html\",\n        history_records\u003dhistory_records,\n        db_connected\u003ddb"
+      }, {
+        "text": "_connected,\n        db_path\u003dstr(OUTPUT_ACCESS_PATH.name),\n    )\n\n\n@"
+      }, {
+        "text": "app.route(\"/api/seed-demo-history\", methods\u003d[\"POST\"])\ndef api_seed_demo_"
+      }, {
+        "text": "history():\n    \"\"\"\n    Generate realistic historical snapshots (past days, weeks, and months) from current\n    baseline"
+      }, {
+        "text": " records and store them in MS Access + output_history so DoD/WoW/MoM can be tested immediately.\n    \"\"\"\n"
+      }, {
+        "text": "    current_records \u003d load_records()\n    if not current_records:\n        return jsonify({\"success\": False, \""
+      }, {
+        "text": "error\": \"No baseline records found. Run a scrape first.\"}), 400\n\n    now \u003d datetime.now(timezone.utc)\n    # Offsets in days covering past 3 days, past 3 weeks, and past 3 months\n"
+      }, {
+        "text": "    day_offsets \u003d [90, 60, 30, 21, 14, "
+      }, {
+        "text": "7, 3, 2, 1, 0]\n    seeded_batch: List[Dict[str, Any]]"
+      }, {
+        "text": " \u003d []\n\n    for idx, days_ago in enumerate(day_offsets):\n        snap_dt \u003d now - timedelta(days\u003ddays_"
+      }, {
+        "text": "ago)\n        # Simulate slight market depreciation over time (older prices were ~1% to 6% higher)\n        historical_factor \u003d 1.0 + (days_ago * 0.0006)\n\n        for rec in current_records:"
+      }, {
+        "text": "\n            clone \u003d copy.deepcopy(rec)\n            jitter \u003d random.uniform(-0.008, 0.008"
+      }, {
+        "text": ") if days_ago \u003e 0 else 0.0\n            base_price \u003d int(rec.get"
+      }, {
+        "text": "(\"buyback_price\", 0))\n            clone[\"buyback_price\"] \u003d int(round(base"
+      }, {
+        "text": "_price * (historical_factor + jitter), -1))\n            clone[\"timestamp\"] \u003d snap_dt.isoformat()\n            "
+      }, {
+        "text": "seeded_batch.append(clone)\n\n    # Save to MS Access\n    saved_access \u003d save_to_access("
+      }, {
+        "text": "seeded_batch, OUTPUT_ACCESS_PATH)\n    # Also append to output.json so JSON fallback works if Access driver"
+      }, {
+        "text": " isn\u0027t installed\n    save_to_json(seeded_batch, OUTPUT_JSON_PATH)\n\n    return jsonify({\n        "
+      }, {
+        "text": "\"success\": True,\n        \"access_saved\": saved_access,\n        \"message\": f\"Seed"
+      }, {
+        "text": "ed {len(seeded_batch)} historical records across {len(day_offsets)} time periods!\",\n    })\n"
+      }, {
+        "text": "```\n\n---\n\n### Step 3: Create `templates/report.html`\nCreate a file named `report.html` inside your `templates/"
+      }, {
+        "text": "` folder (`templates/report.html`):\n\n```html\n\u003c!DOCTYPE html\u003e\n\u003chtml lang\u003d\"en\"\u003e\n"
+      }, {
+        "text": "\u003chead\u003e\n  \u003cmeta charset\u003d\"UTF-8\" /\u003e\n  \u003cmeta name\u003d\"viewport\" content\u003d\"width\u003ddevice-width, initial"
+      }, {
+        "text": "-scale\u003d1.0\" /\u003e\n  \u003ctitle\u003eDoD / WoW / MoM Price Comparison Report"
+      }, {
+        "text": " — Mobile Price Intelligence\u003c/title\u003e\n  \u003cscript src\u003d\"https://cdn.tailwindcss.com\"\u003e\u003c/script\u003e\n  \u003cscript"
+      }, {
+        "text": " src\u003d\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/"
+      }, {
+        "text": "chart.umd.min.js\"\u003e\u003c/script\u003e\n  \u003clink href\u003d\"https://fonts.googleapis.com/"
+      }, {
+        "text": "css2?family\u003dInter:wght@400;500;600;700\u0026display\u003dswap\" rel"
+      }, {
+        "text": "\u003d\"stylesheet\" /\u003e\n  \u003cstyle\u003e\n    body { font-family: \u0027Inter\u0027, sans-serif; background-color: #0"
+      }, {
+        "text": "f172a; color: #f8fafc; }\n    .glass-card { background:"
+      }, {
+        "text": " rgba(30, 41, 59, 0.85); backdrop-filter: blur(10"
+      }, {
+        "text": "px); border: 1px solid rgba(148, 163, 184, 0."
+      }, {
+        "text": "15); }\n    .tab-active { background: linear-gradient(135deg, #3"
+      }, {
+        "text": "b82f6, #2563eb); color: #fff; box-shadow: 0 4px 1"
+      }, {
+        "text": "2px rgba(37, 99, 235, 0.35); }\n"
+      }, {
+        "text": "    .tab-inactive { background: rgba(51, 65, 85, 0.5"
+      }, {
+        "text": "); color: #cbd5e1; }\n    .tab-inactive:hover { background: rgba(7"
+      }, {
+        "text": "1, 85, 105, 0.7); }\n    ::-webkit-scrollbar { width"
+      }, {
+        "text": ": 8px; height: 8px; }\n    ::-webkit-scrollbar-track { background: #"
+      }, {
+        "text": "1e293b; }\n    ::-webkit-scrollbar-thumb { background: #4755"
+      }, {
+        "text": "69; border-radius: 4px; }\n  \u003c/style\u003e\n\u003c/head\u003e\n\u003cbody"
+      }, {
+        "text": " class\u003d\"min-h-screen pb-16\"\u003e\n\n  \u003c!-- Top Navigation Header --\u003e\n  \u003cheader class\u003d\"border-"
+      }, {
+        "text": "b border-slate-800 bg-slate-900/90 sticky top-0 z-30 backdrop-blur\"\u003e"
+      }, {
+        "text": "\n    \u003cdiv class\u003d\"max-w-7xl mx-auto px-4 sm:px-6 py"
+      }, {
+        "text": "-4 flex flex-wrap items-center justify-between gap-4\"\u003e\n      \u003cdiv class\u003d\"flex items-center gap"
+      }, {
+        "text": "-3\"\u003e\n        \u003cdiv class\u003d\"h-10 w-10 rounded-xl bg-blue-600/"
+      }, {
+        "text": "20 border border-blue-500/40 flex items-center justify-center text-blue-"
+      }, {
+        "text": "400 font-bold text-lg\"\u003e\n          📊\n        \u003c/div\u003e\n        \u003cdiv\u003e\n          \u003ch1 class\u003d\"text-lg"
+      }, {
+        "text": " sm:text-xl font-bold text-white tracking-tight\"\u003e\n            Historical Price Comparison Report (DoD / WoW / MoM"
+      }, {
+        "text": ")\n          \u003c/h1\u003e\n          \u003cp class\u003d\"text-xs text-slate-400 flex items-center"
+      }, {
+        "text": " gap-2\"\u003e\n            \u003cspan\u003eSource: \u003cstrong\u003e{{ db_path }}\u003c/strong\u003e\u003c/span\u003e\n            {% if db_connected"
+      }, {
+        "text": " %}\n              \u003cspan class\u003d\"inline-flex items-center px-2 py-0.5 rounded-full text-[11px]"
+      }, {
+        "text": " font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-5"
+      }, {
+        "text": "00/30\"\u003e\n                ● MS Access Connected\n              \u003c/span\u003e\n            {% else %}\n              \u003cspan class"
+      }, {
+        "text": "\u003d\"inline-flex items-center px-2 py-0.5 rounded-full text-[11px]"
+      }, {
+        "text": " font-medium bg-amber-500/20 text-amber-300 border border-amber"
+      }, {
+        "text": "-500/30\"\u003e\n                ● Using JSON Snapshot Fallback\n              \u003c/span\u003e\n            {% endif %}\n          \u003c/p\u003e"
+      }, {
+        "text": "\n        \u003c/div\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"flex items-center gap-2.5\"\u003e\n        \u003ca href\u003d\"/\" class\u003d\""
+      }, {
+        "text": "px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-800"
+      }, {
+        "text": " hover:bg-slate-700 text-slate-200 border border-slate-700"
+      }, {
+        "text": " transition\"\u003e\n          ← Back to Live Scraper\n        \u003c/a\u003e\n        \u003cbutton id\u003d\"btnSeedHistory\" onclick\u003d\"seedDemoHistory"
+      }, {
+        "text": "()\" class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-indigo-600/90 hover"
+      }, {
+        "text": ":bg-indigo-500 text-white border border-indigo-400/30 transition\"\u003e"
+      }, {
+        "text": "\n          ⚡ Generate Sample Historical Data\n        \u003c/button\u003e\n        \u003cbutton onclick\u003d\"exportComparisonCSV()\" class\u003d\"px-3."
+      }, {
+        "text": "5 py-2 rounded-lg text-xs font-medium bg-emerald-600/90 hover"
+      }, {
+        "text": ":bg-emerald-500 text-white border border-emerald-400/30 transition\"\u003e"
+      }, {
+        "text": "\n          ⬇ Export Matrix CSV\n        \u003c/button\u003e\n        {% if db_connected %}\n        \u003ca href\u003d\"/download/access\""
+      }, {
+        "text": " class\u003d\"px-3.5 py-2 rounded-lg text-xs font-medium bg-blue-6"
+      }, {
+        "text": "00/90 hover:bg-blue-500 text-white border border-blue-40"
+      }, {
+        "text": "0/30 transition\"\u003e\n          🗄 Download .accdb\n        \u003c/a\u003e\n        {% endif %}\n      \u003c/div\u003e"
+      }, {
+        "text": "\n    \u003c/div\u003e\n  \u003c/header\u003e\n\n  \u003cmain class\u003d\"max-w-7xl mx-auto px"
+      }, {
+        "text": "-4 sm:px-6 mt-6 space-y-6\"\u003e\n\n    \u003c!-- Control Bar: Period Mode +"
+      }, {
+        "text": " Filters --\u003e\n    \u003csection class\u003d\"glass-card rounded-2xl p-5\"\u003e\n      \u003cdiv class\u003d\"flex flex"
+      }, {
+        "text": "-col lg:flex-row lg:items-center justify-between gap-4\"\u003e\n\n        \u003c!-- Period Gran"
+      }, {
+        "text": "ularity Tabs --\u003e\n        \u003cdiv\u003e\n          \u003clabel class\u003d\"block text-xs uppercase tracking-wider text-slate-400 font-"
+      }, {
+        "text": "semibold mb-2\"\u003e\n            Comparison Timeframe\n          \u003c/label\u003e\n          \u003cdiv class\u003d\"inline-flex rounded-xl"
+      }, {
+        "text": " p-1 bg-slate-900/90 border border-slate-800 gap-1\"\u003e"
+      }, {
+        "text": "\n            \u003cbutton id\u003d\"tab-day\" onclick\u003d\"setGranularity(\u0027day\u0027)\" class\u003d\"px-4 py"
+      }, {
+        "text": "-2 rounded-lg text-xs font-semibold transition tab-active\"\u003e\n              📅 Day-on-Day (DoD"
+      }, {
+        "text": ")\n            \u003c/button\u003e\n            \u003cbutton id\u003d\"tab-week\" onclick\u003d\"setGranularity(\u0027week\u0027)\""
+      }, {
+        "text": " class\u003d\"px-4 py-2 rounded-lg text-xs font-semibold transition tab-inactive\"\u003e\n              "
+      }, {
+        "text": "📆 Week-on-Week (WoW)\n            \u003c/button\u003e\n            \u003cbutton id\u003d\"tab-month"
+      }, {
+        "text": "\" onclick\u003d\"setGranularity(\u0027month\u0027)\" class\u003d\"px-4 py-2 rounded-lg text-xs font"
+      }, {
+        "text": "-semibold transition tab-inactive\"\u003e\n              🗓 Month-on-Month (MoM)\n            \u003c/button\u003e"
+      }, {
+        "text": "\n          \u003c/div\u003e\n        \u003c/div\u003e\n\n        \u003c!-- Filters --\u003e\n        \u003cdiv class\u003d\"grid grid-cols-1 sm:grid-cols-4"
+      }, {
+        "text": " gap-3 flex-1 max-w-3xl\"\u003e\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text"
+      }, {
+        "text": "-xs text-slate-400 mb-1\"\u003eSearch Model\u003c/label\u003e\n            \u003cinput id\u003d\"filterSearch\" type\u003d\"text\""
+      }, {
+        "text": " oninput\u003d\"renderReport()\" placeholder\u003d\"e.g. iPhone 13, S23...\"\n              class\u003d\"w-full px"
+      }, {
+        "text": "-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text"
+      }, {
+        "text": "-xs text-white focus:outline-none focus:border-blue-500\" /\u003e\n          \u003c/div\u003e\n\n"
+      }, {
+        "text": "          \u003cdiv\u003e\n            \u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eBrand"
+      }, {
+        "text": "\u003c/label\u003e\n            \u003cselect id\u003d\"filterBrand\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full"
+      }, {
+        "text": " px-3 py-2 rounded-lg bg-slate-900 border border-slate-700"
+      }, {
+        "text": " text-xs text-white focus:outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"ALL"
+      }, {
+        "text": "\"\u003eAll Brands\u003c/option\u003e\n              \u003coption value\u003d\"Apple\"\u003eApple\u003c/option\u003e\n              \u003coption value\u003d\""
+      }, {
+        "text": "Samsung\"\u003eSamsung\u003c/option\u003e\n            \u003c/select\u003e\n          \u003c/div\u003e\n\n          \u003cdiv\u003e\n            \u003clabel class\u003d\"block"
+      }, {
+        "text": " text-xs text-slate-400 mb-1\"\u003eCondition Grade\u003c/label\u003e\n            \u003cselect id"
+      }, {
+        "text": "\u003d\"filterGrade\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full px-3 py-2 rounded-"
+      }, {
+        "text": "lg bg-slate-900 border border-slate-700 text-xs text-white focus:"
+      }, {
+        "text": "outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"Grade A\" selected\u003eGrade A (Verified Baseline)\u003c/"
+      }, {
+        "text": "option\u003e\n              \u003coption value\u003d\"Grade B\"\u003eGrade B (Good)\u003c/option\u003e\n              \u003coption value\u003d\""
+      }, {
+        "text": "Grade C\"\u003eGrade C (Fair)\u003c/option\u003e\n              \u003coption value\u003d\"Grade D\"\u003eGrade D (Defective)\u003c/option\u003e\n              \u003c"
+      }, {
+        "text": "option value\u003d\"ALL\"\u003eAll Condition Grades\u003c/option\u003e\n            \u003c/select\u003e\n          \u003c/div\u003e\n\n          \u003cdiv\u003e\n            "
+      }, {
+        "text": "\u003clabel class\u003d\"block text-xs text-slate-400 mb-1\"\u003eStorage\u003c/label\u003e\n"
+      }, {
+        "text": "            \u003cselect id\u003d\"filterStorage\" onchange\u003d\"renderReport()\"\n              class\u003d\"w-full px-3 py"
+      }, {
+        "text": "-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text"
+      }, {
+        "text": "-white focus:outline-none focus:border-blue-500\"\u003e\n              \u003coption value\u003d\"ALL"
+      }, {
+        "text": "\"\u003eAll Capacities\u003c/option\u003e\n              \u003coption value\u003d\"64 GB\"\u003e64 GB\u003c/option\u003e\n              \u003coption"
+      }, {
+        "text": " value\u003d\"128 GB\"\u003e128 GB\u003c/option\u003e\n              \u003coption value\u003d\"256 GB"
+      }, {
+        "text": "\"\u003e256 GB\u003c/option\u003e\n              \u003coption value\u003d\"512 GB\"\u003e512 GB\u003c/option\u003e\n            \u003c/select"
+      }, {
+        "text": "\u003e\n          \u003c/div\u003e\n        \u003c/div\u003e\n\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Summary KPI Cards --\u003e\n    \u003csection class\u003d\"grid"
+      }, {
+        "text": " grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4\"\u003e\n"
+      }, {
+        "text": "      \u003cdiv class\u003d\"glass-card rounded-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate"
+      }, {
+        "text": "-400\"\u003eTracked Period Buckets\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiPeriods\" class\u003d\"text-2xl font-bold text-"
+      }, {
+        "text": "white mt-1\"\u003e0\u003c/div\u003e\n        \u003cspan id\u003d\"kpiPeriodRange\" class\u003d\"text-[11px"
+      }, {
+        "text": "] text-slate-400\"\u003e—\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded-"
+      }, {
+        "text": "xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eLatest Avg"
+      }, {
+        "text": " Buyback Price\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiLatestAvg\" class\u003d\"text-2xl font-bold text-blue"
+      }, {
+        "text": "-400 mt-1\"\u003e₹0\u003c/div\u003e\n        \u003cspan class\u003d\"text-[11px] text"
+      }, {
+        "text": "-slate-400\"\u003eAcross filtered devices\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded"
+      }, {
+        "text": "-xl p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eAvg"
+      }, {
+        "text": " Period-over-Period Change\u003c/span\u003e\n        \u003cdiv id\u003d\"kpiAvgDelta\" class\u003d\"text-2xl font-bold text"
+      }, {
+        "text": "-emerald-400 mt-1\"\u003e0.0%\u003c/div\u003e\n        \u003cspan id\u003d\"kpiDeltaLabel\" class\u003d\"text-[11"
+      }, {
+        "text": "px] text-slate-400\"\u003eLatest vs Previous Period\u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"glass-card rounded-xl"
+      }, {
+        "text": " p-4\"\u003e\n        \u003cspan class\u003d\"text-xs text-slate-400\"\u003eBiggest Price Mover\u003c/span\u003e\n        \u003cdiv id"
+      }, {
+        "text": "\u003d\"kpiTopMover\" class\u003d\"text-base font-bold text-amber-300 mt-1 truncate"
+      }, {
+        "text": "\"\u003eN/A\u003c/div\u003e\n        \u003cspan id\u003d\"kpiTopMoverSub\" class\u003d\"text-[11px]"
+      }, {
+        "text": " text-slate-400\"\u003e—\u003c/span\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Historical Trend Line Chart"
+      }, {
+        "text": " --\u003e\n    \u003csection class\u003d\"glass-card rounded-2xl p-5\"\u003e\n      \u003cdiv class\u003d\"flex items"
+      }, {
+        "text": "-center justify-between mb-4\"\u003e\n        \u003cdiv\u003e\n          \u003ch2 class\u003d\"text-sm font-bold text-white uppercase"
+      }, {
+        "text": " tracking-wider\" id\u003d\"chartTitle\"\u003e\n            Historical Price Trend\n          \u003c/h2\u003e\n          \u003cp class\u003d\"text-xs text-"
+      }, {
+        "text": "slate-400\"\u003e\n            Visualizes buyback price movements across selected time buckets (top 6 matching variants)\n          \u003c/p\u003e\n"
+      }, {
+        "text": "        \u003c/div\u003e\n      \u003c/div\u003e\n      \u003cdiv class\u003d\"h-72 w-full\"\u003e\n        \u003ccanvas id"
+      }, {
+        "text": "\u003d\"trendChart\"\u003e\u003c/canvas\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n    \u003c!-- Crosstab Comparison Matrix Table --\u003e\n    \u003csection class"
+      }, {
+        "text": "\u003d\"glass-card rounded-2xl overflow-hidden\"\u003e\n      \u003cdiv class\u003d\"px-5 py-4"
+      }, {
+        "text": " border-b border-slate-800 flex flex-wrap items-center justify-between gap-2\"\u003e\n        \u003cdiv\u003e\n          "
+      }, {
+        "text": "\u003ch2 class\u003d\"text-sm font-bold text-white uppercase tracking-wider\" id\u003d\"matrixTitle\"\u003e\n            Day"
+      }, {
+        "text": "-on-Day (DoD) Price Comparison Matrix\n          \u003c/h2\u003e\n          \u003cp class\u003d\"text-xs text-slate"
+      }, {
+        "text": "-400\"\u003e\n            Compares each period\u0027s average buyback quote and highlights Latest vs. Previous variance (Δ ₹ and Δ %)\n"
+      }, {
+        "text": "          \u003c/p\u003e\n        \u003c/div\u003e\n        \u003cspan id\u003d\"rowCountBadge\" class\u003d\"px-2.5 py-1 rounded"
+      }, {
+        "text": "-full text-xs font-medium bg-slate-800 text-slate-300\"\u003e\n          0 variants\n"
+      }, {
+        "text": "        \u003c/span\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class\u003d\"overflow-x-auto\"\u003e\n        \u003ctable class\u003d\"w"
+      }, {
+        "text": "-full text-left border-collapse\"\u003e\n          \u003cthead id\u003d\"matrixThead\" class\u003d\"bg-slate-"
+      }, {
+        "text": "900/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-"
+      }, {
+        "text": "800\"\u003e\n          \u003c/thead\u003e\n          \u003ctbody id\u003d\"matrixTbody\" class\u003d\"divide-y divide-slate-800/"
+      }, {
+        "text": "70 text-xs\"\u003e\n          \u003c/tbody\u003e\n        \u003c/table\u003e\n      \u003c/div\u003e\n    \u003c/section\u003e\n\n  \u003c/main\u003e"
+      }, {
+        "text": "\n\n  \u003cscript\u003e\n    // Injected historical records from Flask backend\n    const RAW_HISTORY \u003d {{ history_records |"
+      }, {
+        "text": " tojson | safe }};\n    let currentGranularity \u003d \u0027day\u0027; // \u0027day\u0027 | \u0027week\u0027 | \u0027month"
+      }, {
+        "text": "\u0027\n    let trendChartInstance \u003d null;\n    let latestExportRows \u003d [];\n\n    function getBucketKey"
+      }, {
+        "text": "(record, mode) {\n      const rawTs \u003d record.scraped_at || record.timestamp || \u0027\u0027;\n      const"
+      }, {
+        "text": " d \u003d rawTs ? new Date(rawTs) : new Date();\n      if (isNaN(d."
+      }, {
+        "text": "getTime())) return \u0027Unknown\u0027;\n\n      if (mode \u003d\u003d\u003d \u0027day\u0027) {\n        if (record.report_date \u0026\u0026 record.report"
+      }, {
+        "text": "_date.length \u003e\u003d 10) {\n          return record.report_date.substring(0, 10);\n"
+      }, {
+        "text": "        }\n        return d.toISOString().substring(0, 10);\n      }\n\n      if (mode \u003d\u003d\u003d \u0027week"
+      }, {
+        "text": "\u0027) {\n        if (record.report_week) return record.report_week;\n        // Compute ISO week\n"
+      }, {
+        "text": "        const temp \u003d new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate"
+      }, {
+        "text": "()));\n        const dayNum \u003d temp.getUTCDay() || 7;\n        temp.setUTCDate(temp.get"
+      }, {
+        "text": "UTCDate() + 4 - dayNum);\n        const yearStart \u003d new Date(Date.UTC(temp.getUTCFullYear(), "
+      }, {
+        "text": "0, 1));\n        const weekNo \u003d Math.ceil((((temp - yearStart) / 86"
+      }, {
+        "text": "400000) + 1) / 7);\n        return `${temp.getUTCFullYear()}-W${String("
+      }, {
+        "text": "weekNo).padStart(2, \u00270\u0027)}`;\n      }\n\n      if (mode \u003d\u003d\u003d \u0027month\u0027)"
+      }, {
+        "text": " {\n        if (record.report_month) return record.report_month;\n        return `${d."
+      }, {
+        "text": "getFullYear()}-${String(d.getMonth() + 1).padStart(2, \u00270\u0027)"
+      }, {
+        "text": "}`;\n      }\n      return \u0027Unknown\u0027;\n    }\n\n    function getGradeShort(record) {\n"
+      }, {
+        "text": "      const g \u003d record.grade_code || record.condition || \u0027\u0027;\n      if (g.includes(\u0027Grade A\u0027))"
+      }, {
+        "text": " return \u0027Grade A\u0027;\n      if (g.includes(\u0027Grade B\u0027)) return \u0027Grade B\u0027;\n      if"
+      }, {
+        "text": " (g.includes(\u0027Grade C\u0027)) return \u0027Grade C\u0027;\n      if (g.includes(\u0027Grade D\u0027))"
+      }, {
+        "text": " return \u0027Grade D\u0027;\n      return g.split(\u0027:\u0027)[0].trim() || \u0027Grade A\u0027;\n    }"
+      }, {
+        "text": "\n\n    function setGranularity(mode) {\n      currentGranularity \u003d mode;\n      [\u0027day\u0027, \u0027"
+      }, {
+        "text": "week\u0027, \u0027month\u0027].forEach(m \u003d\u003e {\n        const btn \u003d document.getElementById(`tab-${m}`);\n        btn"
+      }, {
+        "text": ".className \u003d (m \u003d\u003d\u003d mode)\n          ? \u0027px-4 py-2 rounded-lg text-xs font-semibold transition"
+      }, {
+        "text": " tab-active\u0027\n          : \u0027px-4 py-2 rounded-lg text-xs font-semibold transition"
+      }, {
+        "text": " tab-inactive\u0027;\n      });\n\n      const titles \u003d {\n        day: \u0027Day-on-Day (DoD)"
+      }, {
+        "text": " Price Comparison Matrix\u0027,\n        week: \u0027Week-on-Week (WoW) Price Comparison Matrix\u0027,\n        "
+      }, {
+        "text": "month: \u0027Month-on-Month (MoM) Price Comparison Matrix\u0027\n      };\n      document.get"
+      }, {
+        "text": "ElementById(\u0027matrixTitle\u0027).textContent \u003d titles[mode];\n      renderReport();\n    }\n\n    "
+      }, {
+        "text": "function formatINR(val) {\n      if (val \u003d\u003d\u003d null || val \u003d\u003d\u003d undefined || isNaN(val)) return \u0027—\u0027;"
+      }, {
+        "text": "\n      return \u0027₹\u0027 + Math.round(val).toLocaleString(\u0027en-IN\u0027);\n    }"
+      }, {
+        "text": "\n\n    function renderReport() {\n      const searchVal \u003d document.getElementById(\u0027filterSearch\u0027).value.trim().to"
+      }, {
+        "text": "LowerCase();\n      const brandVal \u003d document.getElementById(\u0027filterBrand\u0027).value;\n      const"
+      }, {
+        "text": " gradeVal \u003d document.getElementById(\u0027filterGrade\u0027).value;\n      const storageVal \u003d document.get"
+      }, {
+        "text": "ElementById(\u0027filterStorage\u0027).value;\n\n      // 1. Filter records\n      const filtered \u003d RAW_"
+      }, {
+        "text": "HISTORY.filter(r \u003d\u003e {\n        const brand \u003d (r.brand || \u0027\u0027).trim();\n        const model \u003d (r"
+      }, {
+        "text": ".model || \u0027\u0027).toLowerCase();\n        const storage \u003d (r.storage || \u0027\u0027).trim();\n        const"
+      }, {
+        "text": " grade \u003d getGradeShort(r);\n\n        if (brandVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 brand.toLowerCase() !\u003d\u003d brandVal."
+      }, {
+        "text": "toLowerCase()) return false;\n        if (gradeVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 grade !\u003d\u003d gradeVal) return false;\n"
+      }, {
+        "text": "        if (storageVal !\u003d\u003d \u0027ALL\u0027 \u0026\u0026 storage.toUpperCase() !\u003d\u003d storageVal.toUpperCase())"
+      }, {
+        "text": " return false;\n        if (searchVal \u0026\u0026 !model.includes(searchVal) \u0026\u0026 !brand.toLower"
+      }, {
+        "text": "Case().includes(searchVal)) return false;\n        return true;\n      });\n\n      // 2. Collect sorted"
+      }, {
+        "text": " unique period buckets\n      const periodSet \u003d new Set();\n      const deviceGroups \u003d {};\n\n      filtered.forEach(r \u003d\u003e"
+      }, {
+        "text": " {\n        const period \u003d getBucketKey(r, currentGranularity);\n        periodSet.add(period);\n\n"
+      }, {
+        "text": "        const grade \u003d getGradeShort(r);\n        const key \u003d `${r.brand}||${r.model}||${r."
+      }, {
+        "text": "storage}||${grade}`;\n        if (!deviceGroups[key]) {\n          deviceGroups[key] \u003d {\n            brand: r."
+      }, {
+        "text": "brand,\n            model: r.model,\n            storage: r.storage,\n            grade: grade,\n            "
+      }, {
+        "text": "buckets: {}\n          };\n        }\n        if (!deviceGroups[key].buckets[period]) {\n"
+      }, {
+        "text": "          deviceGroups[key].buckets[period] \u003d [];\n        }\n        deviceGroups[key].buckets["
+      }, {
+        "text": "period].push(Number(r.buyback_price) || 0);\n      });\n\n      const periods \u003d Array.from("
+      }, {
+        "text": "periodSet).sort();\n      const displayPeriods \u003d periods.slice(-8); // Show up to last 8 periods"
+      }, {
+        "text": " cleanly\n\n      // 3. Build table header\n      const thead \u003d document.getElementById(\u0027matrixThead\u0027);"
+      }, {
+        "text": "\n      let headHTML \u003d `\u003ctr\u003e\n        \u003cth class\u003d\"py-3.5 px-4\"\u003eBrand\u003c/th\u003e\n        \u003cth class\u003d\""
+      }, {
+        "text": "py-3.5 px-4\"\u003eModel\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-"
+      }, {
+        "text": "3\"\u003eStorage\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-3\"\u003eGrade\u003c/th\u003e`;\n\n      "
+      }, {
+        "text": "displayPeriods.forEach(p \u003d\u003e {\n        headHTML +\u003d `\u003cth class\u003d\"py-3.5 px"
+      }, {
+        "text": "-3 text-right font-semibold text-slate-300\"\u003e${p}\u003c/th\u003e`;\n      });\n\n"
+      }, {
+        "text": "      headHTML +\u003d `\n        \u003cth class\u003d\"py-3.5 px-4 text-right text-blue-300\"\u003eΔ"
+      }, {
+        "text": " Price (INR)\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-4 text-right text-blue-3"
+      }, {
+        "text": "00\"\u003eΔ Change (%)\u003c/th\u003e\n        \u003cth class\u003d\"py-3.5 px-4 text-right"
+      }, {
+        "text": " text-slate-300\"\u003eOverall Δ (First→Last)\u003c/th\u003e\n      \u003c/tr\u003e`;\n      thead.innerHTML \u003d headHTML"
+      }, {
+        "text": ";\n\n      // 4. Build rows \u0026 compute KPIs\n      const tbody \u003d document.getElementById(\u0027matrixTbody"
+      }, {
+        "text": "\u0027);\n      const rows \u003d Object.values(deviceGroups).sort((a, b) \u003d\u003e a.model."
+      }, {
+        "text": "localeCompare(b.model));\n      document.getElementById(\u0027rowCountBadge\u0027).textContent \u003d `${"
+      }, {
+        "text": "rows.length} variants`;\n\n      let latestPrices \u003d [];\n      let popChangesPct \u003d [];\n      let"
+      }, {
+        "text": " topMover \u003d { name: \u0027N/A\u0027, pct: 0, diff: 0 };\n      latestExportRows \u003d [];\n\n"
+      }, {
+        "text": "      if (rows.length \u003d\u003d\u003d 0) {\n        tbody.innerHTML \u003d `\u003ctr\u003e\n          \u003ctd colspan\u003d\"${"
+      }, {
+        "text": "displayPeriods.length + 7}\" class\u003d\"py-12 text-center text-slate-400\"\u003e\n            No matching historical records"
+      }, {
+        "text": " found. Click \u003cstrong\u003e\"⚡ Generate Sample Historical Data\"\u003c/strong\u003e above or run a scrape first.\n          \u003c/td\u003e\n        \u003c/tr\u003e"
+      }, {
+        "text": "`;\n      } else {\n        let bodyHTML \u003d \u0027\u0027;\n\n        rows.forEach(item \u003d\u003e {\n          // Compute"
+      }, {
+        "text": " average per period\n          const avgByPeriod \u003d {};\n          displayPeriods.forEach(p \u003d\u003e {\n            const"
+      }, {
+        "text": " arr \u003d item.buckets[p];\n            if (arr \u0026\u0026 arr.length \u003e 0) {\n              "
+      }, {
+        "text": "avgByPeriod[p] \u003d arr.reduce((a, b) \u003d\u003e a + b, 0) /"
+      }, {
+        "text": " arr.length;\n            } else {\n              avgByPeriod[p] \u003d null;\n            }\n"
+      }, {
+        "text": "          });\n\n          // Find non-null periods for this row\n          const validPeriods \u003d displayPeriods.filter(p \u003d\u003e avgByPeriod["
+      }, {
+        "text": "p] !\u003d\u003d null);\n          const latestVal \u003d validPeriods.length \u003e\u003d 1 ? avgByPeriod[valid"
+      }, {
+        "text": "Periods[validPeriods.length - 1]] : null;\n          const prevVal \u003d validPeriods.length \u003e\u003d"
+      }, {
+        "text": " 2 ? avgByPeriod[validPeriods[validPeriods.length - 2]] : null;\n          const firstVal \u003d validPeriods"
+      }, {
+        "text": ".length \u003e\u003d 2 ? avgByPeriod[validPeriods[0]] : null;\n\n          if (latestVal !\u003d\u003d null) latestPrices"
+      }, {
+        "text": ".push(latestVal);\n\n          let diffINR \u003d null;\n          let diffPct \u003d null;\n          if (latest"
+      }, {
+        "text": "Val !\u003d\u003d null \u0026\u0026 prevVal !\u003d\u003d null \u0026\u0026 prevVal \u003e 0) {\n            diffINR \u003d latestVal -"
+      }, {
+        "text": " prevVal;\n            diffPct \u003d (diffINR / prevVal) * 100;\n            popChangesPct.push(diffPct"
+      }, {
+        "text": ");\n\n            if (Math.abs(diffPct) \u003e Math.abs(topMover.pct)) {\n              topMover \u003d { name"
+      }, {
+        "text": ": `${item.model}`, pct: diffPct, diff: diffINR };\n            }\n          }\n\n          let overallDiffINR"
+      }, {
+        "text": " \u003d (latestVal !\u003d\u003d null \u0026\u0026 firstVal !\u003d\u003d null) ? (latestVal - firstVal) : null;\n          let overallPct"
+      }, {
+        "text": " \u003d (overallDiffINR !\u003d\u003d null \u0026\u0026 firstVal \u003e 0) ? ((overallDiffINR / firstVal) *"
+      }, {
+        "text": " 100) : null;\n\n          // Prepare export row\n          const expObj \u003d {\n            Brand: item."
+      }, {
+        "text": "brand,\n            Model: item.model,\n            Storage: item.storage,\n            Grade: item."
+      }, {
+        "text": "grade\n          };\n          displayPeriods.forEach(p \u003d\u003e {\n            expObj[p] \u003d avg"
+      }, {
+        "text": "ByPeriod[p] !\u003d\u003d null ? Math.round(avgByPeriod[p]) : \u0027\u0027;\n          });\n"
+      }, {
+        "text": "          expObj[\u0027Delta_INR\u0027] \u003d diffINR !\u003d\u003d null ? Math.round(diffINR) : \u0027\u0027;\n"
+      }, {
+        "text": "          expObj[\u0027Delta_Pct\u0027] \u003d diffPct !\u003d\u003d null ? diffPct.toFixed(2) + \u0027%\u0027"
+      }, {
+        "text": " : \u0027\u0027;\n          latestExportRows.push(expObj);\n\n          // Format badge styling\n          let deltaBadge"
+      }, {
+        "text": " \u003d \u0027\u003cspan class\u003d\"text-slate-500\"\u003e—\u003c/span\u003e\u0027;\n          let pctBadge \u003d \u0027\u003cspan class"
+      }, {
+        "text": "\u003d\"text-slate-500\"\u003e—\u003c/span\u003e\u0027;\n          if (diffINR !\u003d\u003d null) {\n            const"
+      }, {
+        "text": " sign \u003d diffINR \u003e 0 ? \u0027+\u0027 : \u0027\u0027;\n            const cls \u003d diffINR \u003e 0\n              ? \u0027text-emerald-40"
+      }, {
+        "text": "0 font-semibold\u0027\n              : (diffINR \u003c 0 ? \u0027text-rose-400 font-semibold\u0027 : \u0027text-"
+      }, {
+        "text": "slate-400\u0027);\n            deltaBadge \u003d `\u003cspan class\u003d\"${cls}\"\u003e${sign}${formatINR(diffINR"
+      }, {
+        "text": ")}\u003c/span\u003e`;\n            pctBadge \u003d `\u003cspan class\u003d\"px-2 py-0.5 rounded text-[11px] ${"
+      }, {
+        "text": "\n              diffINR \u003e 0 ? \u0027bg-emerald-500/15 text-emerald-3"
+      }, {
+        "text": "00\u0027 :\n              diffINR \u003c 0 ? \u0027bg-rose-500/15 text-rose-300\u0027"
+      }, {
+        "text": " : \u0027bg-slate-800 text-slate-400\u0027\n            }\"\u003e${sign}${diffPct"
+      }, {
+        "text": ".toFixed(2)}%\u003c/span\u003e`;\n          }\n\n          let overallBadge \u003d \u0027\u003cspan class\u003d\"text-slate"
+      }, {
+        "text": "-500\"\u003e—\u003c/span\u003e\u0027;\n          if (overallDiffINR !\u003d\u003d null) {\n            const sign \u003d overall"
+      }, {
+        "text": "DiffINR \u003e 0 ? \u0027+\u0027 : \u0027\u0027;\n            const cls \u003d overallDiffINR \u003e 0 ? \u0027text-"
+      }, {
+        "text": "emerald-400\u0027 : (overallDiffINR \u003c 0 ? \u0027text-rose-400\u0027"
+      }, {
+        "text": " : \u0027text-slate-400\u0027);\n            overallBadge \u003d `\u003cspan class\u003d\"${cls}\"\u003e${sign}${format"
+      }, {
+        "text": "INR(overallDiffINR)} (${sign}${overallPct.toFixed(1)}%)\u003c/span\u003e`;\n          }\n\n"
+      }, {
+        "text": "          bodyHTML +\u003d `\u003ctr class\u003d\"hover:bg-slate-800/40 transition\"\u003e\n            "
+      }, {
+        "text": "\u003ctd class\u003d\"py-3 px-4 font-medium text-slate-300\"\u003e${item.brand}"
+      }, {
+        "text": "\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-4 font-semibold text-white\"\u003e${item.model}"
+      }, {
+        "text": "\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-3 text-slate-300\"\u003e${item.storage"
+      }, {
+        "text": "}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3 px-3\"\u003e\n              \u003cspan class\u003d\"px-2 py-0.5 rounded"
+      }, {
+        "text": " text-[11px] bg-slate-800 text-slate-300 border border-slate-"
+      }, {
+        "text": "700\"\u003e${item.grade}\u003c/span\u003e\n            \u003c/td\u003e`;\n\n          displayPeriods.forEach(p \u003d\u003e {"
+      }, {
+        "text": "\n            const v \u003d avgByPeriod[p];\n            bodyHTML +\u003d `\u003ctd class\u003d\"py-3 px-3 text"
+      }, {
+        "text": "-right font-mono ${v !\u003d\u003d null ? \u0027text-slate-200\u0027 : \u0027text-slate-600\u0027}\"\u003e"
+      }, {
+        "text": "\n              ${v !\u003d\u003d null ? formatINR(v) : \u0027—\u0027}\n            \u003c/td\u003e`;\n          });\n\n          bodyHTML +\u003d"
+      }, {
+        "text": " `\n            \u003ctd class\u003d\"py-3 px-4 text-right font-mono\"\u003e${deltaBadge}\u003c/td\u003e\n            \u003ctd"
+      }, {
+        "text": " class\u003d\"py-3 px-4 text-right font-mono\"\u003e${pctBadge}\u003c/td\u003e\n            \u003ctd class\u003d\"py-3"
+      }, {
+        "text": " px-4 text-right font-mono text-[11px]\"\u003e${overallBadge}\u003c/td\u003e\n          \u003c/tr\u003e`;\n"
+      }, {
+        "text": "        });\n\n        tbody.innerHTML \u003d bodyHTML;\n      }\n\n      // 5. Update KPI summary"
+      }, {
+        "text": " cards\n      document.getElementById(\u0027kpiPeriods\u0027).textContent \u003d displayPeriods.length;\n      document"
+      }, {
+        "text": ".getElementById(\u0027kpiPeriodRange\u0027).textContent \u003d displayPeriods.length \u003e 0\n        ? `${displayPeriods"
+      }, {
+        "text": "[0]} → ${displayPeriods[displayPeriods.length - 1]}`\n        : \u0027No time buckets\u0027;"
+      }, {
+        "text": "\n\n      const avgLatest \u003d latestPrices.length \u003e 0\n        ? latestPrices.reduce((a, b"
+      }, {
+        "text": ") \u003d\u003e a + b, 0) / latestPrices.length\n        : 0;\n      document.getElementById(\u0027kpiLatest"
+      }, {
+        "text": "Avg\u0027).textContent \u003d formatINR(avgLatest);\n\n      const avgPop \u003d popChangesPct.length \u003e 0"
+      }, {
+        "text": "\n        ? popChangesPct.reduce((a, b) \u003d\u003e a + b, 0) / popChangesPct.length\n        : "
+      }, {
+        "text": "0;\n      const deltaEl \u003d document.getElementById(\u0027kpiAvgDelta\u0027);\n      deltaEl.textContent \u003d `${avgPop"
+      }, {
+        "text": " \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${avgPop.toFixed(2)}%`;\n      deltaEl.className"
+      }, {
+        "text": " \u003d `text-2xl font-bold mt-1 ${\n        avgPop \u003e 0 ? \u0027text-emerald-400"
+      }, {
+        "text": "\u0027 : (avgPop \u003c 0 ? \u0027text-rose-400\u0027 : \u0027text-slate-"
+      }, {
+        "text": "300\u0027)\n      }`;\n\n      document.getElementById(\u0027kpiTopMover\u0027).textContent \u003d top"
+      }, {
+        "text": "Mover.name;\n      document.getElementById(\u0027kpiTopMoverSub\u0027).textContent \u003d topMover.name !\u003d\u003d \u0027N/A\u0027"
+      }, {
+        "text": "\n        ? `${topMover.diff \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${formatINR(topMover.diff)}"
+      }, {
+        "text": " (${topMover.pct \u003e 0 ? \u0027+\u0027 : \u0027\u0027}${topMover.pct.toFixed(2)}%)"
+      }, {
+        "text": "`\n        : \u0027Need at least 2 time periods\u0027;\n\n      // 6. Update Chart.js visualization"
+      }, {
+        "text": "\n      updateTrendChart(displayPeriods, rows.slice(0, 6));\n    }\n\n    function updateTrendChart(periods, top"
+      }, {
+        "text": "Rows) {\n      const ctx \u003d document.getElementById(\u0027trendChart\u0027).getContext(\u00272d\u0027);"
+      }, {
+        "text": "\n      if (trendChartInstance) {\n        trendChartInstance.destroy();\n      }\n\n      const palette \u003d"
+      }, {
+        "text": " [\u0027#3b82f6\u0027, \u0027#10b981\u0027, \u0027#f59e0b\u0027,"
+      }, {
+        "text": " \u0027#ec4899\u0027, \u0027#8b5cf6\u0027, \u0027#06b6d4\u0027];\n      "
+      }, {
+        "text": "const datasets \u003d topRows.map((row, idx) \u003d\u003e {\n        const dataPts \u003d periods.map(p \u003d\u003e {"
+      }, {
+        "text": "\n          const arr \u003d row.buckets[p];\n          return (arr \u0026\u0026 arr.length \u003e 0)\n"
+      }, {
+        "text": "            ? Math.round(arr.reduce((a, b) \u003d\u003e a + b, 0) / arr"
+      }, {
+        "text": ".length)\n            : null;\n        });\n\n        return {\n          label: `${row.model}"
+      }, {
+        "text": " (${row.grade})`,\n          data: dataPts,\n          borderColor: palette[idx % palette."
+      }, {
+        "text": "length],\n          backgroundColor: palette[idx % palette.length] + \u002733\u0027,\n          borderWidth: 2.5,\n"
+      }, {
+        "text": "          tension: 0.3,\n          spanGaps: true,\n          pointRadius: 4\n"
+      }, {
+        "text": "        };\n      });\n\n      trendChartInstance \u003d new Chart(ctx, {\n        type: \u0027line\u0027,"
+      }, {
+        "text": "\n        data: { labels: periods, datasets },\n        options: {\n          responsive: true,\n          "
+      }, {
+        "text": "maintainAspectRatio: false,\n          interaction: { mode: \u0027index\u0027, intersect: false },\n          plugins: {"
+      }, {
+        "text": "\n            legend: {\n              labels: { color: \u0027#cbd5e1\u0027, font: { size: 11 } }\n            },"
+      }, {
+        "text": "\n            tooltip: {\n              callbacks: {\n                label: (ctx) \u003d\u003e `${ctx.dataset.label}: ₹${"
+      }, {
+        "text": "(ctx.parsed.y || 0).toLocaleString(\u0027en-IN\u0027)}`\n              }\n            }\n          },\n          scales"
+      }, {
+        "text": ": {\n            x: {\n              ticks: { color: \u0027#94a3b8\u0027, font: { size: 11"
+      }, {
+        "text": " } },\n              grid: { color: \u0027rgba(148, 163, 184,"
+      }, {
+        "text": " 0.08)\u0027 }\n            },\n            y: {\n              ticks: {\n                color: \u0027#94a3b8"
+      }, {
+        "text": "\u0027,\n                font: { size: 11 },\n                callback: (v) \u003d\u003e \u0027₹\u0027 + v"
+      }, {
+        "text": ".toLocaleString(\u0027en-IN\u0027)\n              },\n              grid: { color: \u0027rgba(14"
+      }, {
+        "text": "8, 163, 184, 0.08)\u0027 }\n            }\n          "
+      }, {
+        "text": "}\n        }\n      });\n    }\n\n    async function seedDemoHistory() {\n      const btn \u003d"
+      }, {
+        "text": " document.getElementById(\u0027btnSeedHistory\u0027);\n      const origText \u003d btn.innerHTML;\n      btn.disabled"
+      }, {
+        "text": " \u003d true;\n      btn.innerHTML \u003d \u0027⏳ Seeding History...\u0027;\n\n      try {\n        const res \u003d await fetch(\u0027/api/"
+      }, {
+        "text": "seed-demo-history\u0027, { method: \u0027POST\u0027 });\n        const data \u003d await res.json();\n"
+      }, {
+        "text": "        if (data.success) {\n          window.location.reload();\n        } else {\n          alert(data."
+      }, {
+        "text": "error || \u0027Failed to seed history\u0027);\n          btn.disabled \u003d false;\n          btn.innerHTML \u003d origText;\n        "
+      }, {
+        "text": "}\n      } catch (err) {\n        alert(\u0027Error seeding history: \u0027 + err);\n        btn.disabled \u003d false;\n        "
+      }, {
+        "text": "btn.innerHTML \u003d origText;\n      }\n    }\n\n    function exportComparisonCSV() {\n      "
+      }, {
+        "text": "if (!latestExportRows.length) {\n        alert(\u0027No rows to export.\u0027);\n        return;\n      }\n      const headers \u003d Object"
+      }, {
+        "text": ".keys(latestExportRows[0]);\n      const csvLines \u003d [\n        headers.join(\u0027,\u0027),\n        ...latestExportRows."
+      }, {
+        "text": "map(row \u003d\u003e\n          headers.map(h \u003d\u003e `\"${String(row[h] ?? \u0027\u0027).replace("
+      }, {
+        "text": "/\"/g, \u0027\"\"\u0027)}\"`).join(\u0027,\u0027)\n        )\n      ];\n      const blob \u003d new Blob(["
+      }, {
+        "text": "csvLines.join(\u0027\\n\u0027)], { type: \u0027text/csv;charset\u003dutf-8;\u0027 });\n      const url \u003d URL.create"
+      }, {
+        "text": "ObjectURL(blob);\n      const a \u003d document.createElement(\u0027a\u0027);\n      a.href \u003d url"
+      }, {
+        "text": ";\n      a.download \u003d `price_comparison_${currentGranularity}_${new Date().toISOString().slice"
+      }, {
+        "text": "(0,10)}.csv`;\n      a.click();\n      URL.revokeObjectURL(url);\n    }\n\n"
+      }, {
+        "text": "    // Initialize on load\n    document.addEventListener(\u0027DOMContentLoaded\u0027, () \u003d\u003e {\n      renderReport"
+      }, {
+        "text": "();\n    });\n  \u003c/script\u003e\n\u003c/body\u003e\n\u003c/html\u003e\n```\n\n---\n\n### Step 4: How"
+      }, {
+        "text": " to Access \u0026 Use the Comparison Report\n1. Start your Flask web server:\n   ```powershell\n   python app.py\n   ```\n2"
+      }, {
+        "text": ". Open **`http://127.0.0.1:5000/report`** in your browser ("
+      }, {
+        "text": "you can also add a link `\u003ca href\u003d\"/report\"\u003e📊 Historical Comparison Report\u003c/a\u003e` to your main `templates/index.html` navbar)."
+      }, {
+        "text": "\n3. If you have only scraped once today and want to immediately test how **Day-on-Day**, **Week-on-Week**,"
+      }, {
+        "text": " and **Month-on-Month** comparisons look, click the **\"⚡ Generate Sample Historical Data\"** button in the top-right bar"
+      }, {
+        "text": ". It will populate historical snapshots (1, 2, 3 days ago; 1, 2, 3 weeks ago; 1,"
+      }, {
+        "text": " 2, 3 months ago) into your MS Access database (`mobile_price_history.accdb`) and reload the matrix"
+      }, {
+        "text": "."
+      }, {
+        "text": "",
+        "thoughtSignature": "ElkKVwFpFH0TMhSCG7ugaSuLlbCuqjBFe+ecXWBLSNuFkduB9xss2yvdQLiCyANWTFRqkUo6azgJqkJmVtSfk/H4o7Pm4GlmmpE9OctuyBRN6vPnU8WY1XqT9Q=="
+      }],
+      "createTime": "2026-10-31T08:25:03.439Z"
+    }],
+    "pendingInputs": [{
+      "text": "",
+      "role": "user"
+    }]
+  }
+}

@@ -89,4 +89,3 @@ CONDITION_TIERS = {
         "factor": 0.45,
     },
 }
-
