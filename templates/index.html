@@ -339,6 +339,14 @@
       </div>
     </div>
 
+    <div id="focus-banner" class="hidden px-6 py-3 border-b border-white/5 bg-sky-400/5 flex flex-wrap items-center justify-between gap-3">
+      <p class="text-xs text-slate-300">
+        <i class="fa-solid fa-bullseye text-sky-300 mr-1"></i>
+        Showing only the device just scraped: <span id="focus-label" class="font-mono text-sky-200"></span>
+      </p>
+      <button onclick="clearFocus()" class="cta-ghost text-xs font-semibold px-3 py-1.5 rounded-lg">Show all devices</button>
+    </div>
+
     <div class="overflow-x-auto max-h-[560px] overflow-y-auto">
       <table class="w-full text-sm" id="pricing-table">
         <thead>
@@ -350,7 +358,7 @@
             <th class="px-5 py-3 eyebrow font-medium">Grade</th>
             <th class="px-5 py-3 eyebrow font-medium hide-mobile">Defects</th>
             <th class="px-5 py-3 eyebrow font-medium text-center">Origin</th>
-            <th class="px-5 py-3 eyebrow font-medium text-center">Scraped</th>
+            <th class="px-5 py-3 eyebrow font-medium text-center">Last updated</th>
             <th class="px-5 py-3 eyebrow font-medium text-center hide-mobile">Source</th>
           </tr>
         </thead>
@@ -362,6 +370,7 @@
               data-model="{{ rec.model }}"
               data-origin="{{ rec.data_origin }}"
               data-source="{{ 'SwapUp' if 'swapup' in rec.source_url|lower else 'Cashify' }}"
+              data-url="{{ rec.source_url }}"
               data-grade="{{ 'Grade ' + grade_letter }}">
             <td class="px-5 py-4">
               {% if rec.brand == 'Apple' %}
@@ -423,7 +432,7 @@
               {% endif %}
             </td>
             <td class="px-5 py-4 text-center">
-              <span class="font-mono text-[11px] text-slate-400">
+              <span class="js-localtime font-mono text-[11px] text-slate-400 whitespace-nowrap" data-ts="{{ rec.timestamp or '' }}">
                 {{ rec.timestamp[11:19] if rec.timestamp and rec.timestamp|length >= 19 else 'Recent' }}
               </span>
             </td>
@@ -464,7 +473,10 @@
     </div>
 
     <div class="px-6 py-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <p id="visible-count" class="text-xs text-slate-500"></p>
+      <div class="flex flex-col gap-0.5">
+        <p id="visible-count" class="text-xs text-slate-500"></p>
+        <p id="latest-updated" class="text-xs text-sky-300"></p>
+      </div>
       <div class="flex gap-2">
         <a href="/download/csv" class="cta-ghost text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-1.5">
           <i class="fa-solid fa-file-csv text-emerald-300"></i> Download CSV
@@ -574,7 +586,9 @@ async function scrapeSingle() {
     hideLoading();
     if (data.success) {
       showToast("success", "Scrape complete", data.message);
-      setTimeout(() => location.reload(), 1500);
+      setTimeout(() => {
+        location.href = location.pathname + "?focus=" + encodeURIComponent(url);
+      }, 1500);
     } else {
       showToast("error", "Scrape failed", data.error || "Unknown error.");
     }
@@ -617,11 +631,13 @@ function filterTable() {
       (!brand  || row.dataset.brand === brand) &&
       (!origin || row.dataset.origin === origin) &&
       (!grade  || row.dataset.grade === grade) &&
-      (!source || row.dataset.source === source);
+      (!source || row.dataset.source === source) &&
+      (!focusUrl || matchesFocus(row.dataset.url));
     row.style.display = show ? "" : "none";
     if (show) visible++;
   });
 
+  document.getElementById("focus-banner").classList.toggle("hidden", !focusUrl);
   document.getElementById("visible-count").textContent = `Showing ${visible} of ${rows.length} records`;
   document.getElementById("record-count-badge").textContent = `${visible} records`;
 
@@ -630,7 +646,11 @@ function filterTable() {
   emptyRow.classList.toggle("hidden", !(rows.length > 0 && visible === 0));
 }
 
+let focusUrl = "";
+
 function resetFilters() {
+  focusUrl = "";
+  history.replaceState(null, "", location.pathname);
   document.getElementById("search-input").value = "";
   document.getElementById("filter-brand").value = "";
   document.getElementById("filter-origin").value = "";
@@ -677,7 +697,49 @@ function hideToast() {
   document.getElementById("toast").classList.add("hidden");
 }
 
-document.addEventListener("DOMContentLoaded", filterTable);
+function matchesFocus(rowUrl) {
+  // Matches the scraped URL itself, or its variants (e.g. ".../iphone-13" matches ".../iphone-13-128-gb")
+  if (!rowUrl) return false;
+  return rowUrl === focusUrl
+      || rowUrl.startsWith(focusUrl + "-")
+      || rowUrl.startsWith(focusUrl + "/");
+}
+
+function clearFocus() {
+  focusUrl = "";
+  history.replaceState(null, "", location.pathname);
+  filterTable();
+}
+
+function formatLocalTimes() {
+  const opts = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" };
+  let latest = null;
+
+  document.querySelectorAll(".js-localtime").forEach(el => {
+    const d = el.dataset.ts ? new Date(el.dataset.ts) : null;
+    if (d && !isNaN(d)) {
+      el.textContent = d.toLocaleString(undefined, opts);
+      el.title = d.toString();
+      if (!latest || d > latest) latest = d;
+    }
+  });
+
+  const latestEl = document.getElementById("latest-updated");
+  latestEl.textContent = latest
+    ? "Latest update: " + latest.toLocaleString(undefined, opts)
+    : "";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(location.search);
+  const focus = params.get("focus");
+  if (focus) {
+    focusUrl = focus.split("?")[0].replace(/\/$/, "");
+    document.getElementById("focus-label").textContent = focusUrl.split("/").pop();
+  }
+  formatLocalTimes();
+  filterTable();
+});
 </script>
 
 </body>
