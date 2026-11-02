@@ -132,3 +132,34 @@ def test_export_json_and_csv(tmp_path: Path):
     assert reader[0]["model"] == "Galaxy S21 5G (8 GB/128 GB)"
     assert int(reader[0]["buyback_price"]) == 34930
 
+
+def test_priceiq_record_formatting():
+    """Verify conversion of internal records into PriceIQ bulk upload schema."""
+    from priceiq_client import PriceIQClient
+
+    raw_data = [
+        {
+            "brand": "Apple",
+            "model": "Apple iPhone 11 Pro Max",
+            "storage": "512 GB",
+            "buyback_price": 19500,
+            "data_origin": "verified_scraped",
+        }
+    ]
+    formatted = PriceIQClient.format_records_for_priceiq(raw_data)
+    assert len(formatted) == 1
+    assert formatted[0]["device"] == "Apple iPhone 11 Pro Max (512 GB)"
+    assert formatted[0]["price"] == 19500
+    assert formatted[0]["comparables"] == 1
+
+
+def test_database_manager_initialization():
+    """Verify DatabaseManager configuration and default values."""
+    from db import DatabaseManager
+
+    mgr = DatabaseManager(ssh_host="40.192.21.98", ssh_username="tunneluser")
+    assert mgr.ssh_host == "40.192.21.98"
+    assert mgr.ssh_username == "tunneluser"
+    assert mgr.db_dialect in ["postgresql", "mysql"]
+
+
