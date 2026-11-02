@@ -470,8 +470,8 @@
 
         <!-- Max Price Range Filter -->
         <div class="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-          <span class="text-[11px] font-semibold text-slate-500">Max: <strong id="price-filter-label" class="text-slate-800">₹70,000</strong></span>
-          <input id="filter-max-price" type="range" min="5000" max="70000" step="1000" value="70000"
+          <span class="text-[11px] font-semibold text-slate-500">Max: <strong id="price-filter-label" class="text-slate-800">₹1,00,000</strong></span>
+          <input id="filter-max-price" type="range" min="5000" max="100000" step="1000" value="100000"
                  oninput="document.getElementById('price-filter-label').textContent = '₹' + Number(this.value).toLocaleString('en-IN'); filterTable();"
                  class="w-24 h-1.5"/>
         </div>
