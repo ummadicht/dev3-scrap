@@ -135,6 +135,11 @@ class DatabaseManager:
     def create_table_if_not_exists(self, conn: Any) -> None:
         """Ensures the mobile_buyback_pricing table exists."""
         if self.db_dialect == "postgresql":
+            schema = self.db_user or "public"
+            with conn.cursor() as cur:
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema};")
+                cur.execute(f"SET search_path TO {schema}, public;")
+            conn.commit()
             ddl = """
             CREATE TABLE IF NOT EXISTS mobile_buyback_pricing (
                 id SERIAL PRIMARY KEY,
@@ -196,6 +201,8 @@ class DatabaseManager:
 
             with conn.cursor() as cur:
                 if self.db_dialect == "postgresql":
+                    schema = self.db_user or "public"
+                    cur.execute(f"SET search_path TO {schema}, public;")
                     query = """
                     INSERT INTO mobile_buyback_pricing (
                         brand, model, storage, ram, cores, camera,
@@ -268,3 +275,4 @@ if __name__ == "__main__":
     print(f"Target SSH: {db.ssh_username}@{db.ssh_host}:{db.ssh_port}")
     print(f"Key Path: {db.ssh_pkey_path}")
     print(f"Dialect: {db.db_dialect}, Remote Port: {db.db_remote_port}")
+

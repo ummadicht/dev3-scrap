@@ -159,3 +159,4 @@ if __name__ == "__main__":
         print(f"Sample formatted row (Total {len(formatted)}):")
         if formatted:
             print(json.dumps(formatted[0], indent=2))
+
