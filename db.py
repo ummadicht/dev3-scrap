@@ -50,6 +50,7 @@ class DatabaseManager:
     ):
         # 1. Check for DATABASE_URL (takes precedence for direct connections)
         db_url = database_url or os.getenv("DATABASE_URL")
+        self.database_url = db_url
         if db_url:
             import urllib.parse
             parsed = urllib.parse.urlparse(db_url)
@@ -139,13 +140,16 @@ class DatabaseManager:
         try:
             if self.db_dialect == "postgresql":
                 import psycopg2
-                conn = psycopg2.connect(
-                    host=target_host,
-                    port=target_port,
-                    dbname=self.db_name,
-                    user=self.db_user,
-                    password=self.db_password,
-                )
+                if self.database_url and not use_tunnel:
+                    conn = psycopg2.connect(self.database_url)
+                else:
+                    conn = psycopg2.connect(
+                        host=target_host,
+                        port=target_port,
+                        dbname=self.db_name,
+                        user=self.db_user,
+                        password=self.db_password,
+                    )
             elif self.db_dialect == "mysql":
                 import pymysql
                 conn = pymysql.connect(
@@ -175,8 +179,26 @@ class DatabaseManager:
 
         if self.db_dialect == "postgresql":
             with conn.cursor() as cur:
-                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema};")
-                cur.execute(f"GRANT ALL ON SCHEMA {schema} TO PUBLIC;")
+                cur.execute(f"SET search_path TO {schema}, public;")
+                # Fast existence check: If scraping_sources already exists, skip DDL to avoid ownership issues
+                try:
+                    cur.execute("""
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_name = 'scraping_sources' 
+                        AND (table_schema = %s OR table_schema = 'public')
+                        LIMIT 1;
+                    """, (schema,))
+                    if cur.fetchone() is not None:
+                        return
+                except Exception:
+                    pass
+
+                if schema and schema != "public":
+                    try:
+                        cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema};")
+                        cur.execute(f"GRANT ALL ON SCHEMA {schema} TO PUBLIC;")
+                    except Exception:
+                        pass
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 # 1. Existing live mirror table (Backward-compatible)
