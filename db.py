@@ -35,9 +35,9 @@ class DatabaseManager:
 
     def __init__(
         self,
-        ssh_host: str = "40.192.21.98",
+        ssh_host: Optional[str] = None,
         ssh_port: int = 22,
-        ssh_username: str = "tunneluser",
+        ssh_username: Optional[str] = None,
         ssh_pkey_path: Optional[str] = None,
         db_dialect: str = "postgresql",
         db_name: str = "scrapingdb",
@@ -46,19 +46,19 @@ class DatabaseManager:
         db_host: str = "127.0.0.1",
         db_remote_port: Optional[int] = None,
     ):
-        self.ssh_host = os.getenv("SSH_HOST", ssh_host)
-        self.ssh_port = int(os.getenv("SSH_PORT", ssh_port))
-        self.ssh_username = os.getenv("SSH_USERNAME", ssh_username)
-        self.ssh_pkey_path = os.getenv("SSH_PRIVATE_KEY_PATH", ssh_pkey_path or "./proxy.pem")
+        self.ssh_host = ssh_host if ssh_host is not None else os.getenv("SSH_HOST", "")
+        self.ssh_port = int(ssh_port if ssh_port is not None else os.getenv("SSH_PORT", "22"))
+        self.ssh_username = ssh_username if ssh_username is not None else os.getenv("SSH_USERNAME", "")
+        self.ssh_pkey_path = ssh_pkey_path if ssh_pkey_path is not None else os.getenv("SSH_PRIVATE_KEY_PATH", "./proxy.pem")
 
-        self.db_dialect = os.getenv("DB_DIALECT", db_dialect).lower()
-        self.db_name = os.getenv("DB_NAME", db_name)
-        self.db_user = os.getenv("DB_USERNAME", db_user or "guru_user")
-        self.db_password = os.getenv("DB_PASSWORD", db_password or "")
-        self.db_host = os.getenv("DB_HOST", db_host)
+        self.db_dialect = (db_dialect if db_dialect is not None else os.getenv("DB_DIALECT", "postgresql")).lower()
+        self.db_name = db_name if db_name is not None else os.getenv("DB_NAME", "scrapingdb")
+        self.db_user = db_user if db_user is not None else os.getenv("DB_USERNAME", "")
+        self.db_password = db_password if db_password is not None else os.getenv("DB_PASSWORD", "")
+        self.db_host = db_host if db_host is not None else os.getenv("DB_HOST", "127.0.0.1")
 
         default_port = 5432 if self.db_dialect == "postgresql" else 3306
-        self.db_remote_port = int(os.getenv("DB_PORT", db_remote_port or default_port))
+        self.db_remote_port = int(db_remote_port if db_remote_port is not None else os.getenv("DB_PORT", str(default_port)))
 
         self._tunnel = None
 
@@ -101,15 +101,26 @@ class DatabaseManager:
 
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
-        """Context manager providing an active database connection over the tunnel."""
-        local_port = self.start_tunnel()
+        """Context manager providing an active database connection (direct or over SSH tunnel)."""
+        use_tunnel = bool(
+            self.ssh_host
+            and os.path.exists(self.ssh_pkey_path or "")
+            and os.getenv("USE_SSH_TUNNEL", "true").lower() in ("true", "1", "yes")
+        )
+
+        target_host = self.db_host
+        target_port = self.db_remote_port
+
+        if use_tunnel:
+            target_port = self.start_tunnel()
+            target_host = "127.0.0.1" 
         conn = None
         try:
             if self.db_dialect == "postgresql":
                 import psycopg2
                 conn = psycopg2.connect(
-                    host="127.0.0.1",
-                    port=local_port,
+                    host=target_host,
+                    port=target_port,
                     dbname=self.db_name,
                     user=self.db_user,
                     password=self.db_password,
@@ -117,8 +128,8 @@ class DatabaseManager:
             elif self.db_dialect == "mysql":
                 import pymysql
                 conn = pymysql.connect(
-                    host="127.0.0.1",
-                    port=local_port,
+                    host=target_host,
+                    port=target_port,
                     database=self.db_name,
                     user=self.db_user,
                     password=self.db_password,
@@ -134,7 +145,8 @@ class DatabaseManager:
                     conn.close()
                 except Exception:
                     pass
-            self.stop_tunnel()
+            if use_tunnel:
+                self.stop_tunnel()
 
     def create_table_if_not_exists(self, conn: Any) -> None:
         """Initializes all platform tables in PostgreSQL (schema: guru_user)."""

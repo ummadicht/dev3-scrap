@@ -157,9 +157,9 @@ def test_database_manager_initialization():
     """Verify DatabaseManager configuration and default values."""
     from db import DatabaseManager
 
-    mgr = DatabaseManager(ssh_host="40.192.21.98", ssh_username="tunneluser")
-    assert mgr.ssh_host == "40.192.21.98"
-    assert mgr.ssh_username == "tunneluser"
+    mgr = DatabaseManager(ssh_host="10.0.0.1", ssh_username="testuser")
+    assert mgr.ssh_host == "10.0.0.1"
+    assert mgr.ssh_username == "testuser"
     assert mgr.db_dialect in ["postgresql", "mysql"]
 
 
