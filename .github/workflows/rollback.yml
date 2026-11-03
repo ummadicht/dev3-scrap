@@ -1,0 +1,49 @@
+name: Rollback Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: "Specific Docker tag (e.g. scraper-a1b2c3d). Leave empty to auto-restore previous tag."
+        required: false
+        type: string
+
+env:
+  DOCKER_REPO: spectrum
+  SERVICE_NAME: mobile-scraping
+  ENV_KEY: SCRAPER_TAG
+
+jobs:
+  rollback:
+    name: Rollback mobile-scraping over SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Rollback in /srv/platform/scraper
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd /srv/platform/scraper
+
+            TARGET="${{ inputs.target_tag }}"
+            if [ -z "$TARGET" ]; then
+              TARGET=$(grep "^${{ env.ENV_KEY }}=" .rollback.env | cut -d= -f2 || true)
+              if [ -z "$TARGET" ]; then
+                echo "Error: No previous tag found in /srv/platform/scraper/.rollback.env and no target_tag specified." >&2
+                exit 1
+              fi
+              echo "Auto-rolling back mobile-scraping to previous recorded tag: $TARGET"
+            else
+              echo "Rolling back mobile-scraping to specified tag: $TARGET"
+            fi
+
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            sed -i "s/^${{ env.ENV_KEY }}=.*/${{ env.ENV_KEY }}=${TARGET}/" .env
+
+            docker compose pull ${{ env.SERVICE_NAME }}
+            docker compose up -d --no-deps ${{ env.SERVICE_NAME }}
+            echo "Rollback complete. Active configuration:"
+            grep "^${{ env.ENV_KEY }}=" .env
