@@ -210,4 +210,29 @@ def test_price_comparison_delta_calculation():
     assert pct_dec == -10.0
 
 
+def test_driver_manager_registration():
+    """Verify DriverManager properly registers and dispatches mobile_api and rest_api."""
+    from driver_manager import driver_manager, RestApiDriver, CashifyDriver
+
+    assert "mobile_api" in driver_manager.drivers
+    assert isinstance(driver_manager.drivers["mobile_api"], RestApiDriver)
+    assert "website_cashify" in driver_manager.drivers
+    assert isinstance(driver_manager.drivers["website_cashify"], CashifyDriver)
+
+
+def test_api_test_connection_endpoint_validation():
+    """Verify /api/sources/test-connection rejects invalid input."""
+    from app import app
+
+    client = app.test_client()
+    resp = client.post("/api/sources/test-connection", json={})
+    assert resp.status_code == 400
+    assert resp.get_json()["success"] is False
+
+    # Invalid URL format
+    resp2 = client.post("/api/sources/test-connection", json={"target_url": "ftp://not-supported"})
+    assert resp2.status_code == 400
+    assert resp2.get_json()["success"] is False
+
+
 

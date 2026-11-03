@@ -552,6 +552,50 @@ class DatabaseManager:
                     """, (next_status, error_message or f"Completed {records_count} records ({changes_count} changes)", source_id))
                 conn.commit()
 
+    def get_recent_runs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve recent scraping run logs joined with source details."""
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                cur.execute(f"SET search_path TO {schema}, public;")
+                cur.execute("""
+                    SELECT r.id, r.source_id, r.bucket_name, r.run_status,
+                           r.records_count, r.changes_count, r.error_message,
+                           r.started_at, r.completed_at,
+                           s.name as source_name, s.source_type
+                    FROM scraping_runs r
+                    LEFT JOIN scraping_sources s ON r.source_id = s.id
+                    ORDER BY r.started_at DESC
+                    LIMIT %s;
+                """, (limit,))
+                rows = cur.fetchall()
+                results = []
+                for row in rows:
+                    started = row[7]
+                    completed = row[8]
+                    duration_sec = None
+                    if started and completed:
+                        try:
+                            duration_sec = round((completed - started).total_seconds(), 1)
+                        except Exception:
+                            pass
+                    results.append({
+                        "id": row[0],
+                        "source_id": row[1],
+                        "bucket_name": row[2],
+                        "run_status": row[3],
+                        "records_count": row[4] or 0,
+                        "changes_count": row[5] or 0,
+                        "error_message": row[6],
+                        "started_at": started.strftime("%d %b %Y, %I:%M %p") if hasattr(started, "strftime") else str(started or "—"),
+                        "completed_at": completed.strftime("%d %b %Y, %I:%M %p") if hasattr(completed, "strftime") else str(completed or "—"),
+                        "duration_sec": duration_sec,
+                        "source_name": row[9] or "Bulk Catalog Scrape",
+                        "source_type": row[10] or "website_cashify",
+                    })
+                return results
+
     def save_historical_snapshots(
         self,
         run_id: int,

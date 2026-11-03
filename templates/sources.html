@@ -12,6 +12,9 @@
       <p class="text-sm text-slate-500 mt-1">Configure and manage multiple websites, REST APIs, and bucket schedules.</p>
     </div>
     <div class="flex items-center gap-3">
+      <button onclick="openLogsModal()" class="btn-secondary text-sm font-semibold px-4 py-2.5 rounded-xl inline-flex items-center gap-2 shadow-sm border border-slate-200">
+        <i class="fa-solid fa-clock-rotate-left text-xs text-slate-500"></i> Execution Logs
+      </button>
       <button onclick="openAddModal()" class="btn-primary text-sm font-semibold px-4 py-2.5 rounded-xl inline-flex items-center gap-2 shadow-sm">
         <i class="fa-solid fa-plus text-xs"></i> Add Scraping Source
       </button>
@@ -212,10 +215,11 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Source Type</label>
-          <select id="form-type" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
-            <option value="website_cashify">Website (Cashify)</option>
-            <option value="rest_api">REST API (JSON)</option>
-            <option value="generic_html">Generic HTML</option>
+          <select id="form-type" onchange="handleTypeChange()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+            <option value="website_cashify">Website (Cashify Scraper)</option>
+            <option value="mobile_api">Mobile App API (Buyback/Trade-in)</option>
+            <option value="rest_api">REST API (JSON Feed)</option>
+            <option value="generic_html">Generic Website (HTML Scraper)</option>
           </select>
         </div>
         <div>
@@ -230,7 +234,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data Bucket</label>
-          <input type="text" id="form-bucket" required placeholder="e.g. cashify_buyback or wholesale_in"
+          <input type="text" id="form-bucket" required placeholder="e.g. cashify_buyback or mobile_app_in"
                  class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-mono"/>
         </div>
         <div>
@@ -241,9 +245,15 @@
       </div>
 
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target URL / API Endpoint</label>
-        <input type="url" id="form-url" required placeholder="https://www.cashify.in/sell-old-mobile-phone/used-..."
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs font-bold text-slate-700 uppercase">Target URL / API Endpoint</label>
+          <button type="button" onclick="testConnection()" id="btn-test-conn" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-plug text-[11px]"></i> Test Connection
+          </button>
+        </div>
+        <input type="url" id="form-url" required placeholder="https://www.cashify.in/sell-old-mobile-phone/used-... or https://api.endpoint.com/quotes"
                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-mono text-xs"/>
+        <div id="test-conn-result" class="mt-2 hidden text-xs p-2.5 rounded-xl border"></div>
       </div>
 
       <div>
@@ -263,6 +273,46 @@
         <button type="submit" class="btn-primary text-sm font-semibold px-5 py-2 rounded-xl">Save Source</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ===== EXECUTION LOGS MODAL ===== -->
+<div id="logs-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-blue-600"></i> Scraping Execution Logs
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Historical run tracker, duration, snapshots recorded, and errors.</p>
+      </div>
+      <button onclick="closeLogsModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto flex-1 mt-4">
+      <table class="w-full text-left text-xs" id="logs-table">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider sticky top-0">
+          <tr>
+            <th class="px-4 py-3">Run ID</th>
+            <th class="px-4 py-3">Source & Bucket</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Snapshots</th>
+            <th class="px-4 py-3">Changes</th>
+            <th class="px-4 py-3">Duration</th>
+            <th class="px-4 py-3">Started At</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="logs-tbody">
+          <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Loading logs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pt-4 border-t border-slate-100 flex justify-end">
+      <button onclick="closeLogsModal()" class="btn-secondary text-xs font-semibold px-4 py-2 rounded-xl">Close</button>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -299,6 +349,10 @@ function openAddModal() {
   document.getElementById("form-headers").value = "";
   document.getElementById("form-auth").value = "";
 
+  const testRes = document.getElementById("test-conn-result");
+  testRes.className = "mt-2 hidden text-xs p-2.5 rounded-xl border";
+  testRes.innerHTML = "";
+
   const modal = document.getElementById("source-modal");
   modal.classList.remove("hidden");
   modal.classList.add("flex");
@@ -316,9 +370,113 @@ function openEditModal(src) {
   document.getElementById("form-headers").value = src.headers_json ? JSON.stringify(src.headers_json) : "";
   document.getElementById("form-auth").value = src.auth_config_json ? JSON.stringify(src.auth_config_json) : "";
 
+  const testRes = document.getElementById("test-conn-result");
+  testRes.className = "mt-2 hidden text-xs p-2.5 rounded-xl border";
+  testRes.innerHTML = "";
+
   const modal = document.getElementById("source-modal");
   modal.classList.remove("hidden");
   modal.classList.add("flex");
+}
+
+function handleTypeChange() {
+  const type = document.getElementById("form-type").value;
+  const bucketInput = document.getElementById("form-bucket");
+  if (type === "mobile_api" && bucketInput.value === "cashify_buyback") {
+    bucketInput.value = "mobile_app_in";
+  } else if (type === "rest_api" && bucketInput.value === "cashify_buyback") {
+    bucketInput.value = "wholesale_api";
+  }
+}
+
+async function testConnection() {
+  const url = document.getElementById("form-url").value.trim();
+  const method = document.getElementById("form-method").value;
+  const headers = parseJsonField(document.getElementById("form-headers").value);
+  const auth = parseJsonField(document.getElementById("form-auth").value);
+  const resDiv = document.getElementById("test-conn-result");
+  const testBtn = document.getElementById("btn-test-conn");
+
+  if (!url) {
+    resDiv.className = "mt-2 block text-xs p-2.5 rounded-xl border bg-amber-50 text-amber-700 border-amber-200";
+    resDiv.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Please enter a target URL or endpoint first.';
+    return;
+  }
+
+  resDiv.className = "mt-2 block text-xs p-2.5 rounded-xl border bg-blue-50 text-blue-700 border-blue-200";
+  resDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Testing connection to endpoint...';
+  testBtn.disabled = true;
+
+  try {
+    const res = await fetch("/api/sources/test-connection", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        target_url: url,
+        http_method: method,
+        headers_json: headers,
+        auth_config_json: auth
+      })
+    });
+    const data = await res.json();
+    testBtn.disabled = false;
+
+    if (data.success) {
+      resDiv.className = "mt-2 block text-xs p-2.5 rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200";
+      resDiv.innerHTML = `<div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-check"></i> Connection Reachable (HTTP ${data.status_code} • ${data.latency_ms} ms)</div><div class="text-[11px] text-emerald-600 mt-1 font-mono truncate">Response: ${data.preview.replace(/</g, "&lt;")}</div>`;
+    } else {
+      resDiv.className = "mt-2 block text-xs p-2.5 rounded-xl border bg-rose-50 text-rose-700 border-rose-200";
+      resDiv.innerHTML = `<div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-circle-xmark"></i> Connection Failed (${data.status_code ? 'HTTP ' + data.status_code : 'Error'})</div><div class="text-[11px] text-rose-600 mt-1 font-mono">${data.error || 'Server did not return a valid response.'}</div>`;
+    }
+  } catch(err) {
+    testBtn.disabled = false;
+    resDiv.className = "mt-2 block text-xs p-2.5 rounded-xl border bg-rose-50 text-rose-700 border-rose-200";
+    resDiv.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Network Error: ${err.message}`;
+  }
+}
+
+async function openLogsModal() {
+  const modal = document.getElementById("logs-modal");
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+  const tbody = document.getElementById("logs-tbody");
+  tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Loading recent execution runs...</td></tr>';
+
+  try {
+    const res = await fetch("/api/sources/runs?limit=50");
+    const data = await res.json();
+    if (data.success && data.runs && data.runs.length > 0) {
+      tbody.innerHTML = data.runs.map(r => {
+        const badge = r.run_status === 'SUCCESS' ? '<span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-bold text-[10px]">SUCCESS</span>' :
+                      (r.run_status === 'RUNNING' ? '<span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-bold text-[10px] animate-pulse">RUNNING</span>' :
+                      '<span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 font-bold text-[10px]">FAILED</span>');
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-4 py-3 font-mono font-bold text-slate-700">#${r.id}</td>
+            <td class="px-4 py-3">
+              <span class="font-bold text-slate-900 block">${r.source_name}</span>
+              <span class="text-[11px] text-slate-400 font-mono">${r.bucket_name}</span>
+            </td>
+            <td class="px-4 py-3">${badge}</td>
+            <td class="px-4 py-3 font-bold text-slate-700">${r.records_count}</td>
+            <td class="px-4 py-3 font-bold ${r.changes_count > 0 ? 'text-amber-600' : 'text-slate-400'}">${r.changes_count}</td>
+            <td class="px-4 py-3 font-mono text-slate-500">${r.duration_sec != null ? r.duration_sec + 's' : '—'}</td>
+            <td class="px-4 py-3 text-slate-500 text-[11px]">${r.started_at}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No execution logs found. Trigger a scrape to log runs.</td></tr>';
+    }
+  } catch(err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-rose-500 font-bold">Error loading logs: ${err.message}</td></tr>`;
+  }
+}
+
+function closeLogsModal() {
+  const modal = document.getElementById("logs-modal");
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
 }
 
 function closeModal() {

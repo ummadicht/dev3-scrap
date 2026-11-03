@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import requests
 from flask import (
     Flask,
     jsonify,
@@ -424,6 +425,97 @@ def api_delete_source(source_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@app.route("/api/sources/test-connection", methods=["POST"])
+def api_test_connection():
+    """
+    Test connectivity to a source URL or API endpoint before saving.
+    Supports Website, Mobile Application API, and REST API.
+    Measures latency, verifies HTTP status code, and previews response.
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    url = (data.get("target_url") or "").strip()
+    method = (data.get("http_method") or "GET").upper()
+    headers = data.get("headers_json") or {}
+    auth_config = data.get("auth_config_json") or {}
+    params = data.get("params_json") or {}
+
+    if not url:
+        return jsonify({"success": False, "error": "Target URL / API endpoint is required."}), 400
+
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return jsonify({"success": False, "error": "Target URL must start with http:// or https://"}), 400
+
+    if isinstance(headers, str):
+        try:
+            headers = json.loads(headers)
+        except Exception:
+            headers = {}
+    if not isinstance(headers, dict):
+        headers = {}
+
+    if "User-Agent" not in headers:
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 PriceIQ/2.0"
+
+    auth = None
+    if isinstance(auth_config, dict):
+        auth_type = (auth_config.get("type") or "").lower()
+        if auth_type == "basic":
+            auth = (auth_config.get("username", ""), auth_config.get("password", ""))
+        elif auth_type == "bearer":
+            token = auth_config.get("token", "")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
+    import time
+    start_time = time.time()
+    try:
+        if method == "POST":
+            resp = requests.post(url, headers=headers, json=params if isinstance(params, dict) else {}, auth=auth, timeout=12)
+        else:
+            resp = requests.get(url, headers=headers, params=params if isinstance(params, dict) else {}, auth=auth, timeout=12)
+
+        latency_ms = int((time.time() - start_time) * 1000)
+        is_ok = (200 <= resp.status_code < 400)
+        content_type = resp.headers.get("Content-Type", "")
+        preview = resp.text[:300].strip() if resp.text else "(empty response)"
+
+        return jsonify({
+            "success": is_ok,
+            "status_code": resp.status_code,
+            "latency_ms": latency_ms,
+            "content_type": content_type,
+            "message": f"HTTP {resp.status_code} ({latency_ms} ms)",
+            "preview": preview,
+        })
+    except requests.exceptions.Timeout:
+        latency_ms = int((time.time() - start_time) * 1000)
+        return jsonify({
+            "success": False,
+            "status_code": 408,
+            "latency_ms": latency_ms,
+            "error": f"Connection timed out after 12s connecting to {url}",
+        })
+    except requests.exceptions.RequestException as req_err:
+        latency_ms = int((time.time() - start_time) * 1000)
+        return jsonify({
+            "success": False,
+            "status_code": 0,
+            "latency_ms": latency_ms,
+            "error": f"Connection failed: {str(req_err)}",
+        })
+
+
+@app.route("/api/sources/runs", methods=["GET"])
+def api_get_runs():
+    """Retrieve recent scraping execution logs."""
+    limit = request.args.get("limit", 50, type=int)
+    try:
+        runs = db_manager.get_recent_runs(limit=limit)
+        return jsonify({"success": True, "runs": runs})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @app.route("/api/sources/<int:source_id>/scrape", methods=["POST"])
 def api_trigger_source_scrape(source_id: int):
     """
@@ -569,43 +661,78 @@ def api_scrape():
 
 @app.route("/api/scrape-all", methods=["POST"])
 def api_scrape_all():
-    """Trigger full catalog refresh across all devices with historical snapshots."""
+    """
+    Trigger full catalog refresh across all active sources dynamically from database,
+    falling back to TARGET_DEVICES if database sources are not yet configured.
+    """
     try:
-        scraper = CashifyScraper()
-        engine = GradingEngine()
-        all_verified: List[MobilePriceRecord] = []
+        # 1. Load active sources dynamically from PostgreSQL database
+        sources = []
+        try:
+            db_manager.seed_default_sources_if_empty()
+            sources = db_manager.get_sources(status="ACTIVE")
+        except Exception as db_err:
+            logger.warning("Could not query DB for active sources, falling back to config: %s", db_err)
 
-        for dev in TARGET_DEVICES:
-            url = dev.get("url")
-            if url:
-                extracted = scraper.scrape_url(url)
-                all_verified.extend(extracted)
+        all_records: List[Dict[str, Any]] = []
 
-        if not all_verified:
-            return jsonify({"success": False, "error": "No records extracted."}), 404
+        if sources:
+            logger.info("Executing scrape for %d active sources from database...", len(sources))
+            for src in sources:
+                try:
+                    src_records = driver_manager.execute_source(src)
+                    if src_records:
+                        all_records.extend(src_records)
+                except Exception as src_err:
+                    logger.warning("Error scraping source %s (%s): %s", src.get("name"), src.get("target_url"), src_err)
+        else:
+            logger.info("No active DB sources found. Using fallback config.TARGET_DEVICES...")
+            scraper = CashifyScraper()
+            engine = GradingEngine()
+            all_verified: List[MobilePriceRecord] = []
+            for dev in TARGET_DEVICES:
+                url = dev.get("url")
+                if url:
+                    extracted = scraper.scrape_url(url)
+                    all_verified.extend(extracted)
+            if all_verified:
+                full_dataset = engine.build_full_dataset(all_verified, include_grading_matrix=True)
+                all_records = [r.model_dump() for r in full_dataset]
 
-        full_dataset = engine.build_full_dataset(all_verified, include_grading_matrix=True)
-        rec_dicts = [r.model_dump() for r in full_dataset]
+        if not all_records:
+            return jsonify({"success": False, "error": "No records extracted across sources."}), 404
 
         # Historical run in PostgreSQL
         try:
             run_id = db_manager.start_scrape_run(source_id=None, bucket_name="cashify_buyback")
-            db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="cashify_buyback", records=rec_dicts)
-            changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="cashify_buyback", records=rec_dicts)
-            db_manager.finish_scrape_run(run_id, source_id=None, status="SUCCESS", records_count=len(rec_dicts), changes_count=len(changes))
-            db_manager.upsert_records(rec_dicts)
+            db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="cashify_buyback", records=all_records)
+            changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="cashify_buyback", records=all_records)
+            db_manager.finish_scrape_run(run_id, source_id=None, status="SUCCESS", records_count=len(all_records), changes_count=len(changes))
+            db_manager.upsert_records(all_records)
         except Exception as db_err:
             logger.warning("DB logging error: %s", db_err)
 
         existing = load_records()
-        existing, u_count, a_count = upsert_records(existing, full_dataset, include_matrix=True)
+        for r in all_records:
+            grade_prefix = r.get("condition", "").split(":")[0].strip()
+            key = (r.get("source_url", ""), r.get("storage", ""), grade_prefix)
+            found = False
+            for idx, ex in enumerate(existing):
+                if (ex.get("source_url"), ex.get("storage"), ex.get("condition", "").split(":")[0].strip()) == key:
+                    existing[idx].update(r)
+                    found = True
+                    break
+            if not found:
+                existing.append(r)
+
         save_to_json(existing, OUTPUT_JSON_PATH)
         save_to_csv_raw(existing, OUTPUT_CSV_PATH)
 
         return jsonify({
             "success": True,
-            "message": f"Catalog refreshed: {len(all_verified)} verified quotes, {len(rec_dicts)} historical snapshots stored in PostgreSQL.",
+            "message": f"Catalog refreshed: {len(all_records)} snapshots stored in PostgreSQL across dynamic sources.",
             "total_records": len(existing),
+            "sources_processed": len(sources) if sources else len(TARGET_DEVICES),
         })
     except Exception as exc:
         logger.exception("Error during scrape-all")

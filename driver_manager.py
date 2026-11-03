@@ -224,6 +224,7 @@ class DriverManager:
         self.drivers: Dict[str, BaseDriver] = {
             "website_cashify": CashifyDriver(),
             "rest_api": RestApiDriver(),
+            "mobile_api": RestApiDriver(),
             "generic_html": GenericHtmlDriver(),
         }
 
