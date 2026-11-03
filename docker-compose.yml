@@ -1,6 +1,6 @@
 services:
   mobile-scraping:
-    image: mobile-scraping:${IMAGE_TAG}
+    image: mobile-scraping:${SCRAPER_TAG:-${IMAGE_TAG:-latest}}
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8000"
     volumes:

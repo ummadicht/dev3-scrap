@@ -274,48 +274,58 @@ def sources_page():
 def comparison_page():
     """Dedicated Price Comparison and Change Detection report page."""
     try:
-        comparisons = db_manager.get_price_comparison_report(limit=250)
-        stats = db_manager.get_platform_analytics()
-    except Exception as exc:
-        logger.exception("Failed to load comparison data")
-        comparisons = []
-        stats = {"price_increases": 0, "price_decreases": 0, "price_unchanged": 0, "new_items": 0}
+        try:
+            comparisons = db_manager.get_price_comparison_report(limit=250)
+            stats = db_manager.get_platform_analytics()
+        except Exception as exc:
+            logger.exception("Failed to load comparison data from database")
+            comparisons = []
+            stats = {"price_increases": 0, "price_decreases": 0, "price_unchanged": 0, "new_items": 0}
 
-    # Fallback to baseline records so comparison matrix is never blank/null
-    if not comparisons:
-        current_records = load_records_from_storage()
-        comparisons = [
-            {
-                "id": idx + 1,
-                "device_identifier": f"{r.brand} {r.model} ({r.storage or 'Base'})",
-                "condition_grade": r.condition,
-                "old_price_fmt": "—",
-                "new_price_fmt": f"₹{int(r.buyback_price):,}",
-                "diff_fmt": "Baseline",
-                "badge_cls": "bg-sky-50 text-sky-700 border border-sky-200",
-                "change_type": "NEW",
-                "bucket_name": "cashify_buyback",
-                "detected_at": r.timestamp,
-            }
-            for idx, r in enumerate(current_records[:150])
-        ]
-        stats["new_items"] = len(comparisons)
+        # Fallback to baseline records so comparison matrix is never blank/null
+        if not comparisons:
+            current_records = load_records_from_storage()
+            comparisons = [
+                {
+                    "id": idx + 1,
+                    "device_identifier": f"{r.brand} {r.model} ({r.storage or 'Base'})",
+                    "brand": r.brand,
+                    "condition_grade": r.condition,
+                    "old_price_fmt": "—",
+                    "new_price_fmt": f"₹{int(r.buyback_price):,}",
+                    "diff_fmt": "Baseline",
+                    "badge_cls": "bg-sky-50 text-sky-700 border border-sky-200",
+                    "change_type": "NEW",
+                    "bucket_name": "cashify_buyback",
+                    "detected_at": r.timestamp,
+                    "detected_at_fmt": r.timestamp[:16].replace("T", " ") if isinstance(r.timestamp, str) else "Just now",
+                }
+                for idx, r in enumerate(current_records[:150])
+            ]
+            stats["new_items"] = len(comparisons)
 
-    for c_item in comparisons:
-        if not c_item.get("detected_at_fmt"):
-            ts = c_item.get("detected_at")
-            if hasattr(ts, "strftime"):
-                c_item["detected_at_fmt"] = ts.strftime("%d %b %H:%M")
-            elif isinstance(ts, str) and len(ts) >= 16:
-                c_item["detected_at_fmt"] = ts[:16].replace("T", " ")
-            else:
-                c_item["detected_at_fmt"] = "Just now"
+        for c_item in comparisons:
+            if not c_item.get("detected_at_fmt"):
+                ts = c_item.get("detected_at")
+                if hasattr(ts, "strftime"):
+                    c_item["detected_at_fmt"] = ts.strftime("%d %b %H:%M")
+                elif isinstance(ts, str) and len(ts) >= 16:
+                    c_item["detected_at_fmt"] = ts[:16].replace("T", " ")
+                else:
+                    c_item["detected_at_fmt"] = "Just now"
 
-    return render_template(
-        "comparison.html",
-        comparisons=comparisons,
-        stats=stats,
-    )
+        return render_template(
+            "comparison.html",
+            comparisons=comparisons,
+            stats=stats,
+        )
+    except Exception as fatal_err:
+        logger.exception("Critical error in comparison_page: %s", fatal_err)
+        return render_template(
+            "comparison.html",
+            comparisons=[],
+            stats={"price_increases": 0, "price_decreases": 0, "price_unchanged": 0, "new_items": 0},
+        )
 
 
 # ---------------------------------------------------------------------------
