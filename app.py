@@ -301,6 +301,16 @@ def comparison_page():
         ]
         stats["new_items"] = len(comparisons)
 
+    for c_item in comparisons:
+        if not c_item.get("detected_at_fmt"):
+            ts = c_item.get("detected_at")
+            if hasattr(ts, "strftime"):
+                c_item["detected_at_fmt"] = ts.strftime("%d %b %H:%M")
+            elif isinstance(ts, str) and len(ts) >= 16:
+                c_item["detected_at_fmt"] = ts[:16].replace("T", " ")
+            else:
+                c_item["detected_at_fmt"] = "Just now"
+
     return render_template(
         "comparison.html",
         comparisons=comparisons,

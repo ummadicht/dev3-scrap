@@ -159,7 +159,7 @@
 
             <!-- Timestamp -->
             <td class="px-5 py-3.5 text-right text-xs text-slate-400 font-mono">
-              {{ item.detected_at.strftime("%d %b %H:%M") if item.detected_at else "Just now" }}
+              {{ item.detected_at_fmt or (item.detected_at[:16]|replace("T", " ") if item.detected_at is string else (item.detected_at.strftime("%d %b %H:%M") if item.detected_at else "Just now")) }}
             </td>
 
           </tr>
