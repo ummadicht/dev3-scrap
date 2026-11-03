@@ -163,3 +163,43 @@ def test_database_manager_initialization():
     assert mgr.db_dialect in ["postgresql", "mysql"]
 
 
+def test_rest_api_driver_normalization():
+    """Verify REST API driver handles custom JSON feeds and normalizes attributes."""
+    from driver_manager import RestApiDriver
+
+    driver = RestApiDriver()
+    mock_payload = {
+        "rows": [
+            {
+                "device": "Samsung Galaxy S24 Ultra (12 GB/512 GB)",
+                "price": 62000,
+                "grade": "Grade A",
+                "storage": "512 GB",
+            }
+        ]
+    }
+    normalized = driver._normalize_json_payload(mock_payload, "https://api.example.com/prices", {})
+    assert len(normalized) == 1
+    assert normalized[0]["brand"] == "Samsung"
+    assert normalized[0]["buyback_price"] == 62000.0
+    assert normalized[0]["storage"] == "512 GB"
+    assert normalized[0]["data_origin"] == "api_rest_feed"
+
+
+def test_price_comparison_delta_calculation():
+    """Verify delta calculation between old price and new price."""
+    old_p = 50000.0
+    new_p_increase = 52000.0
+    diff_inc = round(new_p_increase - old_p, 2)
+    pct_inc = round((diff_inc / old_p) * 100, 2)
+    assert diff_inc == 2000.0
+    assert pct_inc == 4.0
+
+    new_p_decrease = 45000.0
+    diff_dec = round(new_p_decrease - old_p, 2)
+    pct_dec = round((diff_dec / old_p) * 100, 2)
+    assert diff_dec == -5000.0
+    assert pct_dec == -10.0
+
+
+

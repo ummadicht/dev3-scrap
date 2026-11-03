@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Price Comparison & Change Detection • PriceIQ{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Section -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Historical Price Comparison & Delta Tracking</h1>
+      <p class="text-sm text-slate-500 mt-1">Automated change detection comparing latest scraped values against historical snapshots.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="location.reload()" class="btn-secondary text-xs font-semibold px-3 py-2 rounded-xl inline-flex items-center gap-2">
+        <i class="fa-solid fa-rotate-right text-xs"></i> Refresh Analysis
+      </button>
+    </div>
+  </div>
+
+  <!-- Change Metrics Highlights -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="card-white rounded-2xl p-4 border-l-4 border-l-emerald-500">
+      <span class="text-xs font-bold text-emerald-700 uppercase tracking-wider block">Price Increases</span>
+      <p class="text-2xl font-extrabold text-emerald-600 mt-1">{{ stats.price_increases }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Higher buyback quote</span>
+    </div>
+    <div class="card-white rounded-2xl p-4 border-l-4 border-l-rose-500">
+      <span class="text-xs font-bold text-rose-700 uppercase tracking-wider block">Price Decreases</span>
+      <p class="text-2xl font-extrabold text-rose-600 mt-1">{{ stats.price_decreases }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Depreciated buyback quote</span>
+    </div>
+    <div class="card-white rounded-2xl p-4 border-l-4 border-l-slate-400">
+      <span class="text-xs font-bold text-slate-600 uppercase tracking-wider block">Unchanged Prices</span>
+      <p class="text-2xl font-extrabold text-slate-700 mt-1">{{ stats.price_unchanged }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Stable valuation</span>
+    </div>
+    <div class="card-white rounded-2xl p-4 border-l-4 border-l-sky-500">
+      <span class="text-xs font-bold text-sky-700 uppercase tracking-wider block">New Products</span>
+      <p class="text-2xl font-extrabold text-sky-600 mt-1">{{ stats.new_items }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Initial baseline snapshots</span>
+    </div>
+  </div>
+
+  <!-- Toolbar Filters -->
+  <div class="card-white rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2 flex-1">
+      <div class="relative flex-1 min-w-[200px]">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input id="compare-search" type="text" placeholder="Search device model, brand, or storage..." oninput="filterComparisonTable()"
+               class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition"/>
+      </div>
+      <select id="filter-change-type" onchange="filterComparisonTable()" class="py-2 pl-3 pr-8 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+        <option value="">All Variations</option>
+        <option value="INCREASED">Price Increased</option>
+        <option value="DECREASED">Price Decreased</option>
+        <option value="UNCHANGED">No Change</option>
+        <option value="NEW">New Product / Baseline</option>
+      </select>
+      <select id="filter-bucket" onchange="filterComparisonTable()" class="py-2 pl-3 pr-8 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium font-mono">
+        <option value="">All Buckets</option>
+        <option value="cashify_buyback">cashify_buyback</option>
+        <option value="wholecell_wholesale">wholecell_wholesale</option>
+      </select>
+    </div>
+    <span id="compare-count-badge" class="text-xs font-bold text-slate-600 self-center">
+      Showing {{ comparisons|length }} items
+    </span>
+  </div>
+
+  <!-- Comparison Matrix Table -->
+  <div class="card-white rounded-2xl overflow-hidden shadow-sm">
+    <div class="overflow-x-auto max-h-[640px] overflow-y-auto">
+      <table class="w-full text-left text-sm" id="comparison-table">
+        <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider sticky top-0 z-10">
+          <tr>
+            <th class="px-5 py-3.5">Product & Storage</th>
+            <th class="px-5 py-3.5">Condition Grade</th>
+            <th class="px-5 py-3.5 text-right">Previous Price</th>
+            <th class="px-5 py-3.5 text-right">Current Price</th>
+            <th class="px-5 py-3.5 text-right">Variation (ΔP & %Δ)</th>
+            <th class="px-5 py-3.5 text-center">Status</th>
+            <th class="px-5 py-3.5">Data Bucket</th>
+            <th class="px-5 py-3.5 text-right">Detected At</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="comparison-tbody">
+          {% for item in comparisons %}
+          <tr class="hover:bg-slate-50/70 transition comparison-row"
+              data-device="{{ item.device_identifier|lower }}"
+              data-type="{{ item.change_type }}"
+              data-bucket="{{ item.bucket_name|lower }}">
+            
+            <!-- Product -->
+            <td class="px-5 py-3.5">
+              <p class="font-bold text-slate-900">{{ item.device_identifier }}</p>
+              <span class="text-xs text-slate-500">{{ item.brand }}</span>
+            </td>
+
+            <!-- Condition Grade -->
+            <td class="px-5 py-3.5">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                {{ item.condition_grade }}
+              </span>
+            </td>
+
+            <!-- Previous Price -->
+            <td class="px-5 py-3.5 text-right font-mono font-medium text-slate-500">
+              {{ item.old_price_fmt }}
+            </td>
+
+            <!-- Current Price -->
+            <td class="px-5 py-3.5 text-right font-mono font-bold text-slate-900">
+              {{ item.new_price_fmt }}
+            </td>
+
+            <!-- Variation (Delta) -->
+            <td class="px-5 py-3.5 text-right">
+              {% if item.change_type == 'INCREASED' %}
+              <span class="text-xs font-bold text-emerald-600 font-mono">
+                {{ item.diff_fmt }}
+              </span>
+              {% elif item.change_type == 'DECREASED' %}
+              <span class="text-xs font-bold text-rose-600 font-mono">
+                {{ item.diff_fmt }}
+              </span>
+              {% else %}
+              <span class="text-xs font-mono text-slate-400">
+                {{ item.diff_fmt }}
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Status Badge -->
+            <td class="px-5 py-3.5 text-center">
+              {% if item.change_type == 'INCREASED' %}
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                <i class="fa-solid fa-arrow-trend-up text-[10px]"></i> Increased
+              </span>
+              {% elif item.change_type == 'DECREASED' %}
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1">
+                <i class="fa-solid fa-arrow-trend-down text-[10px]"></i> Decreased
+              </span>
+              {% elif item.change_type == 'NEW' %}
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200 inline-flex items-center gap-1">
+                <i class="fa-solid fa-sparkles text-[10px]"></i> New Baseline
+              </span>
+              {% else %}
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
+                <i class="fa-solid fa-minus text-[10px]"></i> Unchanged
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Bucket -->
+            <td class="px-5 py-3.5 text-xs font-mono text-slate-500">
+              {{ item.bucket_name }}
+            </td>
+
+            <!-- Timestamp -->
+            <td class="px-5 py-3.5 text-right text-xs text-slate-400 font-mono">
+              {{ item.detected_at.strftime("%d %b %H:%M") if item.detected_at else "Just now" }}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function filterComparisonTable() {
+  const query = document.getElementById("compare-search").value.toLowerCase();
+  const ctype = document.getElementById("filter-change-type").value;
+  const btype = document.getElementById("filter-bucket").value.toLowerCase();
+  const rows  = document.querySelectorAll(".comparison-row");
+
+  let visible = 0;
+  rows.forEach(r => {
+    const mQuery  = !query || r.dataset.device.includes(query);
+    const mType   = !ctype || r.dataset.type === ctype;
+    const mBucket = !btype || r.dataset.bucket.includes(btype);
+    const show = mQuery && mType && mBucket;
+    r.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+  document.getElementById("compare-count-badge").textContent = `Showing ${visible} items`;
+}
+</script>
+{% endblock %}
