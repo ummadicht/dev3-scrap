@@ -35,6 +35,7 @@ class DatabaseManager:
 
     def __init__(
         self,
+        database_url: Optional[str] = None,
         ssh_host: Optional[str] = None,
         ssh_port: int = 22,
         ssh_username: Optional[str] = None,
@@ -45,7 +46,23 @@ class DatabaseManager:
         db_password: Optional[str] = None,
         db_host: str = "127.0.0.1",
         db_remote_port: Optional[int] = None,
+        db_schema: Optional[str] = None,
     ):
+        # 1. Check for DATABASE_URL (takes precedence for direct connections)
+        db_url = database_url or os.getenv("DATABASE_URL")
+        if db_url:
+            import urllib.parse
+            parsed = urllib.parse.urlparse(db_url)
+            db_dialect = (parsed.scheme.split("+")[0] or "postgresql").lower()
+            db_user = urllib.parse.unquote(parsed.username or "")
+            db_password = urllib.parse.unquote(parsed.password or "")
+            db_host = parsed.hostname or "127.0.0.1"
+            default_p = 5432 if "postgres" in db_dialect else 3306
+            db_remote_port = parsed.port or default_p
+            parsed_path = parsed.path.lstrip("/")
+            if parsed_path:
+                db_name = parsed_path
+
         self.ssh_host = ssh_host if ssh_host is not None else os.getenv("SSH_HOST", "")
         self.ssh_port = int(ssh_port if ssh_port is not None else os.getenv("SSH_PORT", "22"))
         self.ssh_username = ssh_username if ssh_username is not None else os.getenv("SSH_USERNAME", "")
@@ -59,6 +76,10 @@ class DatabaseManager:
 
         default_port = 5432 if self.db_dialect == "postgresql" else 3306
         self.db_remote_port = int(db_remote_port if db_remote_port is not None else os.getenv("DB_PORT", str(default_port)))
+
+        # Default schema is 'scraper' or 'public'
+        default_schema = "scraper" if self.db_name == "scrapingdb" else "public"
+        self.db_schema = db_schema or os.getenv("DB_SCHEMA", default_schema)
 
         self._tunnel = None
 
@@ -149,12 +170,13 @@ class DatabaseManager:
                 self.stop_tunnel()
 
     def create_table_if_not_exists(self, conn: Any) -> None:
-        """Initializes all platform tables in PostgreSQL (schema: guru_user)."""
-        schema = self.db_user or "public"
+        """Initializes all platform tables in PostgreSQL (schema: scraper / public)."""
+        schema = self.db_schema
 
         if self.db_dialect == "postgresql":
             with conn.cursor() as cur:
                 cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema};")
+                cur.execute(f"GRANT ALL ON SCHEMA {schema} TO PUBLIC;")
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 # 1. Existing live mirror table (Backward-compatible)
@@ -282,7 +304,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("SELECT COUNT(*) FROM scraping_sources;")
                 count = cur.fetchone()[0]
@@ -312,7 +334,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 query = "SELECT * FROM scraping_sources WHERE 1=1"
@@ -343,7 +365,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("SELECT * FROM scraping_sources WHERE id = %s;", (source_id,))
                 row = cur.fetchone()
@@ -370,7 +392,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("""
                     INSERT INTO scraping_sources (
@@ -418,7 +440,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute(query, params)
                 conn.commit()
@@ -439,7 +461,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("DELETE FROM scraping_sources WHERE id = %s;", (source_id,))
                 conn.commit()
@@ -454,7 +476,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("""
                     INSERT INTO scraping_runs (source_id, bucket_name, run_status)
@@ -484,7 +506,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 cur.execute("""
                     UPDATE scraping_runs
@@ -522,7 +544,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 insert_sql = """
@@ -603,7 +625,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 # Retrieve the latest snapshot prices BEFORE this run in the same bucket
@@ -703,7 +725,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 query = """
@@ -751,7 +773,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
 
                 # Sources metrics
@@ -822,7 +844,7 @@ class DatabaseManager:
             inserted_or_updated = 0
 
             with conn.cursor() as cur:
-                schema = self.db_user or "public"
+                schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
                 query = """
                 INSERT INTO mobile_buyback_pricing (

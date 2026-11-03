@@ -162,6 +162,14 @@ def test_database_manager_initialization():
     assert mgr.ssh_username == "testuser"
     assert mgr.db_dialect in ["postgresql", "mysql"]
 
+    # Test DATABASE_URL parsing
+    db_url_mgr = DatabaseManager(database_url="postgresql://devuser:pass123@localhost:5432/swapup_dev")
+    assert db_url_mgr.db_user == "devuser"
+    assert db_url_mgr.db_password == "pass123"
+    assert db_url_mgr.db_name == "swapup_dev"
+    assert db_url_mgr.db_host == "localhost"
+    assert db_url_mgr.db_remote_port == 5432
+
 
 def test_rest_api_driver_normalization():
     """Verify REST API driver handles custom JSON feeds and normalizes attributes."""
