@@ -1,746 +1,398 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mobile Price Intelligence</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
-            body: ['"Inter"', 'system-ui', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-          },
-          colors: {
-            ink: { 950:'#070b14', 900:'#0c1220', 800:'#131b2e', 700:'#1d2740', 600:'#2a3658' },
-            accent: { DEFAULT:'#7dd3fc', soft:'#38bdf8', glow:'#a5f3fc' },
-            signal: { up:'#4ade80', warn:'#fbbf24', down:'#f87171', violet:'#c4b5fd' }
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-  <style>
-    :root { color-scheme: dark; }
-    body {
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(56,189,248,.12), transparent 60%),
-        radial-gradient(900px 500px at 110% 10%, rgba(196,181,253,.10), transparent 60%),
-        #070b14;
-      font-family: 'Inter', system-ui, sans-serif;
-      color: #e2e8f0;
-    }
-    .panel {
-      background: linear-gradient(180deg, rgba(19,27,46,.85), rgba(12,18,32,.85));
-      border: 1px solid rgba(148,163,184,.12);
-      backdrop-filter: blur(12px);
-    }
-    .eyebrow { font-family: 'JetBrains Mono', monospace; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; color: #64748b; }
-    .display { font-family: 'Space Grotesk', system-ui, sans-serif; }
-    .num { font-family: 'Space Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+{% extends "base.html" %}
 
-    .kpi { position: relative; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
-    .kpi:hover { transform: translateY(-2px); border-color: rgba(125,211,252,.35); }
-    .kpi::after {
-      content:""; position:absolute; inset:auto 0 0 0; height:2px;
-      background: linear-gradient(90deg, transparent, var(--tint, #38bdf8), transparent);
-      opacity:.7;
-    }
+{% block title %}Dashboard • Mobile Price Intelligence Platform{% endblock %}
 
-    .device-card { transition: all .2s ease; }
-    .device-card.is-active {
-      border-color: #38bdf8 !important;
-      background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(196,181,253,.06)) !important;
-      box-shadow: 0 0 0 1px rgba(56,189,248,.35), 0 8px 24px -8px rgba(56,189,248,.35);
-    }
+{% block content %}
+<div class="space-y-8">
 
-    .field {
-      background: rgba(7,11,20,.7);
-      border: 1px solid rgba(148,163,184,.18);
-      color: #e2e8f0;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    .field:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.18); }
-    .field option { background: #0c1220; }
-
-    .cta-primary {
-      background: linear-gradient(135deg, #38bdf8, #818cf8);
-      color: #04111d;
-      box-shadow: 0 10px 30px -10px rgba(56,189,248,.6);
-      transition: transform .15s ease, filter .15s ease;
-    }
-    .cta-primary:hover { filter: brightness(1.08); }
-    .cta-primary:active { transform: scale(.98); }
-    .cta-ghost {
-      border: 1px solid rgba(148,163,184,.25);
-      color: #cbd5e1;
-      transition: all .15s ease;
-    }
-    .cta-ghost:hover { border-color: #38bdf8; color: #7dd3fc; background: rgba(56,189,248,.06); }
-
-    .chip-apple   { background: rgba(226,232,240,.08); color:#e2e8f0; border:1px solid rgba(226,232,240,.18); }
-    .chip-samsung { background: rgba(56,189,248,.10); color:#7dd3fc; border:1px solid rgba(56,189,248,.28); }
-    .spec { background: rgba(148,163,184,.08); color:#cbd5e1; border:1px solid rgba(148,163,184,.16); }
-    .spec-cpu { background: rgba(196,181,253,.08); color:#ddd6fe; border:1px solid rgba(196,181,253,.22); }
-    .spec-cam { background: rgba(74,222,128,.08); color:#bbf7d0; border:1px solid rgba(74,222,128,.22); }
-
-    .origin-verified { background: rgba(74,222,128,.12); color:#86efac; border:1px solid rgba(74,222,128,.3); }
-    .origin-simulated{ background: rgba(251,191,36,.10); color:#fde68a; border:1px solid rgba(251,191,36,.28); }
-
-    .grade-a { background: rgba(74,222,128,.14); color:#86efac; }
-    .grade-b { background: rgba(56,189,248,.14); color:#7dd3fc; }
-    .grade-c { background: rgba(251,191,36,.14); color:#fde68a; }
-    .grade-d { background: rgba(248,113,113,.14); color:#fca5a5; }
-
-    .bar-track { background: rgba(148,163,184,.10); }
-    .bar-fill  { background: linear-gradient(90deg, #38bdf8, #818cf8); box-shadow: 0 0 18px -4px rgba(56,189,248,.6); }
-
-    .row { transition: background .15s ease; }
-    .row:hover { background: rgba(56,189,248,.05); }
-    thead th {
-      position: sticky; top: 0; z-index: 5;
-      background: rgba(12,18,32,.95);
-      backdrop-filter: blur(8px);
-    }
-
-    .spinner { border:3px solid rgba(56,189,248,.18); border-top-color:#38bdf8; border-radius:50%; animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    #toast { transition: all .3s ease; }
-    .scrape-btn:active { transform: scale(.98); }
-
-    @media (max-width: 768px) { .hide-mobile { display: none; } }
-  </style>
-</head>
-<body class="min-h-screen antialiased">
-
-<!-- ===== HEADER ===== -->
-<header class="border-b border-white/5 bg-ink-950/60 backdrop-blur sticky top-0 z-30">
-  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-    <div class="flex items-center gap-4 min-w-0">
-      <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-violet-400 flex items-center justify-center shadow-lg shadow-sky-500/20">
-        <i class="fa-solid fa-mobile-screen text-ink-950 text-base"></i>
-      </div>
-      <div class="min-w-0">
-        <p class="eyebrow">Refurb Buyback · SwapUp</p>
-        <h1 class="display font-bold text-white text-xl leading-tight truncate">Mobile Price Intelligence</h1>
-      </div>
+  <!-- ===== TOP HERO & METRICS OVERVIEW ===== -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Multi-Source Price Intelligence</h1>
+      <p class="text-sm text-slate-500 mt-1">Real-time mobile buyback analytics, historical snapshots & automated change detection.</p>
     </div>
     <div class="flex items-center gap-2">
-      <span id="last-updated-nav" class="hidden md:flex items-center gap-2 text-xs text-slate-400 mr-2">
-        <span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span></span>
-        Synced <span class="text-slate-200 font-medium">{{ kpis.last_updated }}</span>
+      <span class="text-xs text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-medium shadow-sm">
+        <i class="fa-solid fa-clock text-blue-500 mr-1.5"></i> Synced: <span class="text-slate-800 font-semibold">{{ kpis.last_updated }}</span>
       </span>
-      <a href="/download/csv" class="cta-ghost text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2">
-        <i class="fa-solid fa-file-csv text-emerald-300"></i> CSV
-      </a>
-      <a href="/download/json" class="cta-ghost text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2">
-        <i class="fa-solid fa-file-code text-amber-300"></i> JSON
-      </a>
     </div>
   </div>
-</header>
 
-<!-- ===== TOAST ===== -->
-<div id="toast" class="fixed top-20 right-4 z-50 hidden max-w-sm w-full">
-  <div id="toast-inner" class="rounded-2xl shadow-2xl px-4 py-3 flex items-start gap-3 border backdrop-blur">
-    <div id="toast-icon" class="text-lg mt-0.5"></div>
-    <div class="flex-1 min-w-0">
-      <p id="toast-title" class="display font-semibold text-sm text-white"></p>
-      <p id="toast-msg" class="text-xs mt-0.5 text-slate-300 break-words"></p>
+  <!-- Metric Cards Grid -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Live Records</span>
+      <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ kpis.total_records }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">{{ kpis.verified_count }} Cashify verified</span>
     </div>
-    <button onclick="hideToast()" class="text-slate-400 hover:text-white ml-1 mt-0.5">
-      <i class="fa-solid fa-xmark"></i>
-    </button>
+
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Scrape Sources</span>
+      <p class="text-2xl font-extrabold text-blue-600 mt-1">{{ platform_stats.total_sources }}</p>
+      <span class="text-[11px] text-emerald-600 font-semibold mt-0.5 block">{{ platform_stats.active_sources }} active sources</span>
+    </div>
+
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Avg Buyback</span>
+      <p class="text-2xl font-extrabold text-indigo-600 mt-1">₹{{ '{:,}'.format(kpis.avg_price) }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Across all models</span>
+    </div>
+
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Highest Quote</span>
+      <p class="text-2xl font-extrabold text-emerald-600 mt-1">₹{{ '{:,}'.format(kpis.max_price) }}</p>
+      <span class="text-[11px] text-slate-500 truncate block mt-0.5" title="{{ kpis.max_device }}">{{ kpis.max_device }}</span>
+    </div>
+
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Lowest Quote</span>
+      <p class="text-2xl font-extrabold text-rose-600 mt-1">₹{{ '{:,}'.format(kpis.min_price) }}</p>
+      <span class="text-[11px] text-slate-500 truncate block mt-0.5" title="{{ kpis.min_device }}">{{ kpis.min_device }}</span>
+    </div>
+
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Brands</span>
+      <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ kpis.brands_tracked }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Apple & Samsung</span>
+    </div>
   </div>
-</div>
 
-<!-- ===== LOADING ===== -->
-<div id="loading-overlay" class="fixed inset-0 bg-ink-950/80 backdrop-blur-sm z-40 hidden items-center justify-center">
-  <div class="panel rounded-3xl px-10 py-8 flex flex-col items-center gap-4 shadow-2xl">
-    <div class="spinner w-12 h-12"></div>
-    <p id="loading-msg" class="display text-white font-semibold text-sm">Scraping live data…</p>
-    <p class="eyebrow">Usually 10–30 seconds</p>
-  </div>
-</div>
-
-<main class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-
-  <!-- ===== HERO KPIs ===== -->
-  <section>
-    <div class="flex items-end justify-between mb-4">
+  <!-- ===== QUICK SCRAPING ACTION PANEL ===== -->
+  <div class="card-white rounded-2xl p-5 shadow-sm">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
       <div>
-        <p class="eyebrow mb-1">Overview</p>
-        <h2 class="display text-2xl font-semibold text-white">Market snapshot</h2>
-      </div>
-    </div>
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#38bdf8">
-        <p class="eyebrow mb-3">Records</p>
-        <p id="kpi-total" class="num text-3xl font-semibold text-white">{{ kpis.total_records }}</p>
-        <p class="text-[11px] text-slate-500 mt-1">All pricing rows</p>
-      </div>
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#4ade80">
-        <p class="eyebrow mb-3">Verified Live</p>
-        <p id="kpi-verified" class="num text-3xl font-semibold text-signal-up">{{ kpis.verified_count }}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Cashify live quotes</p>
-      </div>
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#c4b5fd">
-        <p class="eyebrow mb-3">Avg Buyback</p>
-        <p id="kpi-avg" class="num text-3xl font-semibold text-signal-violet">₹{{ '{:,}'.format(kpis.avg_price) }}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Verified records</p>
-      </div>
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#fbbf24">
-        <p class="eyebrow mb-3">Highest Quote</p>
-        <p id="kpi-max" class="num text-3xl font-semibold text-signal-warn">₹{{ '{:,}'.format(kpis.max_price) }}</p>
-        <p id="kpi-max-device" class="text-[11px] text-slate-500 mt-1 truncate" title="{{ kpis.max_device }}">{{ kpis.max_device.split('(')[0].strip() }}</p>
-      </div>
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#f87171">
-        <p class="eyebrow mb-3">Lowest Quote</p>
-        <p id="kpi-min" class="num text-3xl font-semibold text-signal-down">₹{{ '{:,}'.format(kpis.min_price) }}</p>
-        <p id="kpi-min-device" class="text-[11px] text-slate-500 mt-1 truncate" title="{{ kpis.min_device }}">{{ kpis.min_device.split('(')[0].strip() }}</p>
-      </div>
-
-      <div class="kpi panel rounded-2xl p-4" style="--tint:#94a3b8">
-        <p class="eyebrow mb-3">Brands</p>
-        <p id="kpi-brands" class="num text-3xl font-semibold text-white">{{ kpis.brands_tracked }}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Tracked</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ===== CONTROL PANEL ===== -->
-  <section class="panel rounded-3xl p-6">
-    <div class="flex flex-wrap items-end justify-between gap-2 mb-6">
-      <div>
-        <p class="eyebrow mb-1">Acquisition</p>
-        <h2 class="display text-xl font-semibold text-white flex items-center gap-2">
-          <i class="fa-solid fa-satellite-dish text-sky-400 text-base"></i> Scraping control
+        <h2 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-bolt text-blue-600"></i> Quick Scraping Control
         </h2>
+        <p class="text-xs text-slate-500 mt-0.5">Trigger live scraping by URL or choose from quick target presets.</p>
       </div>
-      <p class="text-xs text-slate-500">Pick a device or paste a Cashify URL to pull live prices</p>
+      <div class="flex items-center gap-2">
+        <a href="/sources" class="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1">
+          Manage all {{ platform_stats.total_sources }} sources <i class="fa-solid fa-arrow-right text-[10px]"></i>
+        </a>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      <div class="lg:col-span-1">
-        <p class="eyebrow mb-3">Quick select</p>
-        <div class="grid grid-cols-1 gap-2">
-          {% for device in target_devices %}
-          <button onclick="selectDevice('{{ device.url }}', this)"
-                  class="device-card group text-left px-3 py-3 rounded-xl border border-white/5 bg-ink-900/60 hover:border-sky-400/40 hover:bg-ink-800 flex items-center gap-3">
-            {% if device.brand == 'Apple' %}
-              <div class="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/10">
-                <i class="fa-brands fa-apple text-slate-200"></i>
-              </div>
-            {% else %}
-              <div class="w-9 h-9 rounded-lg bg-sky-400/10 flex items-center justify-center group-hover:bg-sky-400/20">
-                <i class="fa-solid fa-mobile text-sky-300 text-sm"></i>
-              </div>
-            {% endif %}
-            <div class="min-w-0">
-              <p class="font-semibold text-sm text-white truncate">{{ device.brand }}</p>
-              <p class="text-xs text-slate-400 truncate">{{ device.model_family }}</p>
-            </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Quick Device Select Chips -->
+      <div class="lg:col-span-1 space-y-2">
+        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">Select Target Device</label>
+        <div class="max-h-44 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-xl p-2 bg-slate-50">
+          {% for dev in target_devices %}
+          <button type="button" onclick="selectQuickDevice('{{ dev.url }}', this)"
+                  class="w-full text-left px-3 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition flex items-center justify-between text-xs quick-device-btn">
+            <span class="font-semibold text-slate-800">{{ dev.brand }} {{ dev.model_family }}</span>
+            <span class="text-[10px] text-slate-400 font-mono">{{ dev.series or 'Series' }}</span>
           </button>
           {% endfor %}
         </div>
       </div>
 
-      <div class="lg:col-span-2 flex flex-col gap-4">
+      <!-- URL Input & Action Buttons -->
+      <div class="lg:col-span-2 flex flex-col justify-between space-y-4">
         <div>
-          <p class="eyebrow mb-3">Device URL</p>
+          <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Target Device URL</label>
           <div class="flex gap-2">
-            <input id="custom-url-input" type="url"
-                   placeholder="https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-12"
-                   class="field flex-1 px-4 py-3 rounded-xl text-sm font-mono placeholder:text-slate-600"/>
-            <button onclick="clearUrl()" title="Clear"
-                    class="cta-ghost px-3.5 rounded-xl">
+            <input id="quick-url-input" type="url" placeholder="https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-13"
+                   class="flex-1 px-4 py-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition"/>
+            <button onclick="document.getElementById('quick-url-input').value=''" class="btn-secondary px-3 rounded-xl text-xs" title="Clear">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
-          <p class="text-[11px] text-slate-500 mt-2">Accepts <code class="font-mono text-sky-300">cashify.in/sell-old-mobile-phone/</code> and SwapUp device URLs</p>
+          <p class="text-[11px] text-slate-400 mt-1">Accepts Cashify device URLs or registered source endpoints.</p>
         </div>
 
-        <div class="flex flex-col sm:flex-row gap-3 mt-auto">
-          <button onclick="scrapeSingle()"
-                  class="scrape-btn cta-primary flex-1 flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl text-sm font-semibold">
-            <i class="fa-solid fa-bolt"></i> Scrape selected device
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <button onclick="scrapeQuickSelected()" class="btn-primary flex-1 py-3 px-4 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 shadow-sm">
+            <i class="fa-solid fa-bolt"></i> Scrape Selected Device
           </button>
-          <button onclick="scrapeAll()"
-                  class="scrape-btn cta-ghost flex-1 flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl text-sm font-semibold">
-            <i class="fa-solid fa-rotate"></i> Refresh all devices
+          <button onclick="scrapeAllCatalog()" class="btn-secondary flex-1 py-3 px-4 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2">
+            <i class="fa-solid fa-rotate"></i> Refresh All Catalog Sources
           </button>
         </div>
-
-        <div id="scrape-status" class="hidden rounded-xl px-4 py-3 text-sm border"></div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ===== DATA TABLE ===== -->
-  <section class="panel rounded-3xl overflow-hidden">
-
-    <div class="px-6 py-5 border-b border-white/5 flex flex-col lg:flex-row lg:items-center gap-4">
-      <div class="flex items-center gap-3 flex-1">
-        <div>
-          <p class="eyebrow mb-1">Dataset</p>
-          <div class="flex items-center gap-3">
-            <h2 class="display text-xl font-semibold text-white">Pricing intelligence</h2>
-            <span id="record-count-badge" class="num text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-400/10 text-sky-300 border border-sky-400/25">
-              {{ records|length }} records
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        <div class="relative">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-          <input id="search-input" type="text" placeholder="Search model…" oninput="filterTable()"
-                 class="field pl-9 pr-3 py-2.5 rounded-lg text-sm w-44 placeholder:text-slate-600"/>
-        </div>
-        <select id="filter-brand" onchange="filterTable()" class="field py-2.5 pl-3 pr-8 rounded-lg text-sm">
-          <option value="">All brands</option>
-          <option value="Apple">Apple</option>
-          <option value="Samsung">Samsung</option>
-        </select>
-        <select id="filter-origin" onchange="filterTable()" class="field py-2.5 pl-3 pr-8 rounded-lg text-sm">
-          <option value="">All origins</option>
-          <option value="verified_scraped">Verified only</option>
-          <option value="sample_condition_graded">Simulated only</option>
-        </select>
-        <select id="filter-source" onchange="filterTable()" class="field py-2.5 pl-3 pr-8 rounded-lg text-sm">
-          <option value="">All sources</option>
-          <option value="Cashify">Cashify</option>
-          <option value="SwapUp">SwapUp</option>
-        </select>
-        <select id="filter-grade" onchange="filterTable()" class="field py-2.5 pl-3 pr-8 rounded-lg text-sm">
-          <option value="">All grades</option>
-          <option value="Grade A">Grade A</option>
-          <option value="Grade B">Grade B</option>
-          <option value="Grade C">Grade C</option>
-          <option value="Grade D">Grade D</option>
-        </select>
       </div>
     </div>
+  </div>
 
-    <div id="focus-banner" class="hidden px-6 py-3 border-b border-white/5 bg-sky-400/5 flex flex-wrap items-center justify-between gap-3">
-      <p class="text-xs text-slate-300">
-        <i class="fa-solid fa-bullseye text-sky-300 mr-1"></i>
-        Showing only the device just scraped: <span id="focus-label" class="font-mono text-sky-200"></span>
-      </p>
-      <button onclick="clearFocus()" class="cta-ghost text-xs font-semibold px-3 py-1.5 rounded-lg">Show all devices</button>
+  <!-- ===== RECENT PRICE VARIATIONS WIDGET ===== -->
+  {% if recent_changes %}
+  <div class="card-white rounded-2xl p-5 shadow-sm border-l-4 border-l-blue-600">
+    <div class="flex items-center justify-between mb-3">
+      <div>
+        <h2 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-arrow-trend-up text-blue-600"></i> Recent Price Variations & Deltas
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5">Automated difference between consecutive scraping executions.</p>
+      </div>
+      <a href="/comparison" class="text-xs font-semibold text-blue-600 hover:text-blue-700">
+        View Full Comparison Matrix ({{ recent_changes|length }}) <i class="fa-solid fa-arrow-right text-[10px]"></i>
+      </a>
     </div>
 
-    <div class="overflow-x-auto max-h-[560px] overflow-y-auto">
-      <table class="w-full text-sm" id="pricing-table">
-        <thead>
-          <tr class="text-left">
-            <th class="px-5 py-3 eyebrow font-medium">Brand</th>
-            <th class="px-5 py-3 eyebrow font-medium">Model</th>
-            <th class="px-5 py-3 eyebrow font-medium">Storage</th>
-            <th class="px-5 py-3 eyebrow font-medium text-right">Buyback</th>
-            <th class="px-5 py-3 eyebrow font-medium">Grade</th>
-            <th class="px-5 py-3 eyebrow font-medium hide-mobile">Defects</th>
-            <th class="px-5 py-3 eyebrow font-medium text-center">Origin</th>
-            <th class="px-5 py-3 eyebrow font-medium text-center">Last updated</th>
-            <th class="px-5 py-3 eyebrow font-medium text-center hide-mobile">Source</th>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-100">
+          <tr>
+            <th class="py-2.5 px-3">Device & Variant</th>
+            <th class="py-2.5 px-3 text-right">Previous Price</th>
+            <th class="py-2.5 px-3 text-right">Current Price</th>
+            <th class="py-2.5 px-3 text-right">Variation</th>
+            <th class="py-2.5 px-3 text-center">Status</th>
           </tr>
         </thead>
-        <tbody id="table-body" class="divide-y divide-white/5">
-          {% for rec in records %}
-          {% set grade_letter = 'A' if 'Grade A' in rec.condition else ('B' if 'Grade B' in rec.condition else ('C' if 'Grade C' in rec.condition else 'D')) %}
-          <tr class="row"
-              data-brand="{{ rec.brand }}"
-              data-model="{{ rec.model }}"
-              data-origin="{{ rec.data_origin }}"
-              data-source="{{ 'SwapUp' if 'swapup' in rec.source_url|lower else 'Cashify' }}"
-              data-url="{{ rec.source_url }}"
-              data-grade="{{ 'Grade ' + grade_letter }}">
-            <td class="px-5 py-4">
-              {% if rec.brand == 'Apple' %}
-              <span class="chip-apple text-[11px] font-semibold px-2.5 py-1 rounded-md inline-flex items-center gap-1.5">
-                <i class="fa-brands fa-apple"></i> Apple
+        <tbody class="divide-y divide-slate-100">
+          {% for ch in recent_changes[:5] %}
+          <tr class="hover:bg-slate-50/50">
+            <td class="py-2.5 px-3 font-semibold text-slate-800">{{ ch.device_identifier }} ({{ ch.condition_grade }})</td>
+            <td class="py-2.5 px-3 text-right font-mono text-slate-500">{{ ch.old_price_fmt }}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">{{ ch.new_price_fmt }}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold {% if ch.change_type == 'INCREASED' %}text-emerald-600{% elif ch.change_type == 'DECREASED' %}text-rose-600{% else %}text-slate-400{% endif %}">
+              {{ ch.diff_fmt }}
+            </td>
+            <td class="py-2.5 px-3 text-center">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ ch.badge_cls }}">
+                {{ ch.change_type }}
               </span>
-              {% else %}
-              <span class="chip-samsung text-[11px] font-semibold px-2.5 py-1 rounded-md inline-flex items-center gap-1.5">
-                <i class="fa-solid fa-s"></i> Samsung
-              </span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-4">
-              <p class="font-medium text-white">{{ rec.model.split('(')[0].strip() }}</p>
-              <div class="flex flex-wrap gap-1 mt-1.5">
-                {% if rec.ram %}
-                <span class="spec text-[10px] font-mono px-1.5 py-0.5 rounded">{{ rec.ram }}</span>
-                {% elif '(' in rec.model and 'GB' in rec.model %}
-                <span class="spec text-[10px] font-mono px-1.5 py-0.5 rounded">{{ rec.model.split('(')[1].rstrip(')') }}</span>
-                {% endif %}
-                {% if rec.cores %}
-                <span class="spec-cpu text-[10px] font-mono px-1.5 py-0.5 rounded">{{ rec.cores }} cores</span>
-                {% endif %}
-                {% if rec.camera %}
-                <span class="spec-cam text-[10px] font-mono px-1.5 py-0.5 rounded">{{ rec.camera }}</span>
-                {% endif %}
-              </div>
-            </td>
-            <td class="px-5 py-4">
-              <span class="num bg-white/5 border border-white/10 text-slate-200 text-xs font-semibold px-2.5 py-1 rounded-md">{{ rec.storage }}</span>
-            </td>
-            <td class="px-5 py-4 text-right">
-              <p class="num font-semibold text-white text-lg">₹{{ '{:,}'.format(rec.buyback_price) }}</p>
-              <p class="eyebrow mt-0.5">INR</p>
-            </td>
-            <td class="px-5 py-4">
-              {% if grade_letter == 'A' %}
-              <span class="grade-a text-[11px] font-bold px-2.5 py-1 rounded-md">Grade A</span>
-              {% elif grade_letter == 'B' %}
-              <span class="grade-b text-[11px] font-bold px-2.5 py-1 rounded-md">Grade B</span>
-              {% elif grade_letter == 'C' %}
-              <span class="grade-c text-[11px] font-bold px-2.5 py-1 rounded-md">Grade C</span>
-              {% else %}
-              <span class="grade-d text-[11px] font-bold px-2.5 py-1 rounded-md">Grade D</span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-4 hide-mobile">
-              <p class="text-xs text-slate-400 max-w-xs truncate" title="{{ rec.defects }}">{{ rec.defects }}</p>
-            </td>
-            <td class="px-5 py-4 text-center">
-              {% if rec.data_origin == 'verified_scraped' %}
-              <span class="origin-verified text-[11px] font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5">
-                <i class="fa-solid fa-circle-check"></i> Verified
-              </span>
-              {% else %}
-              <span class="origin-simulated text-[11px] font-semibold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5">
-                <i class="fa-solid fa-flask-vial"></i> Simulated
-              </span>
-              {% endif %}
-            </td>
-            <td class="px-5 py-4 text-center">
-              <span class="js-localtime font-mono text-[11px] text-slate-400 whitespace-nowrap" data-ts="{{ rec.timestamp or '' }}">
-                {{ rec.timestamp[11:19] if rec.timestamp and rec.timestamp|length >= 19 else 'Recent' }}
-              </span>
-            </td>
-            <td class="px-5 py-4 text-center hide-mobile">
-              {% if 'swapup' in rec.source_url|lower %}
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md mr-1 bg-violet-400/10 text-violet-200 border border-violet-400/25">SwapUp</span>
-              {% else %}
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md mr-1 bg-sky-400/10 text-sky-200 border border-sky-400/25">Cashify</span>
-              {% endif %}
-              <a href="{{ rec.source_url }}" target="_blank" rel="noopener" title="{{ rec.source_url }}"
-                 class="inline-flex w-8 h-8 items-center justify-center rounded-lg text-sky-300 hover:bg-sky-400/10 transition">
-                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-              </a>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="9" class="text-center py-20">
-              <i class="fa-solid fa-database text-4xl mb-4 block text-slate-700"></i>
-              <p class="display font-medium text-slate-300">No records yet</p>
-              <p class="text-xs text-slate-500 mt-1">Use the scraping control above to collect live pricing.</p>
             </td>
           </tr>
           {% endfor %}
-          <tr id="filter-empty-row" class="hidden">
-            <td colspan="9" class="text-center py-16">
-              <i class="fa-solid fa-filter-circle-xmark text-4xl mb-4 block text-slate-700"></i>
-              <p class="display font-medium text-slate-300">No devices available</p>
-              <p class="text-xs text-slate-500 mt-1 mb-4">No records match your current search or filters.</p>
-              <button onclick="resetFilters()"
-                      class="cta-ghost text-xs font-semibold px-4 py-2 rounded-lg inline-flex items-center gap-2">
-                <i class="fa-solid fa-rotate-left text-sky-300"></i> Reset filters
-              </button>
-            </td>
-          </tr>
         </tbody>
       </table>
     </div>
+  </div>
+  {% endif %}
 
-    <div class="px-6 py-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div class="flex flex-col gap-0.5">
-        <p id="visible-count" class="text-xs text-slate-500"></p>
-        <p id="latest-updated" class="text-xs text-sky-300"></p>
-      </div>
-      <div class="flex gap-2">
-        <a href="/download/csv" class="cta-ghost text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-1.5">
-          <i class="fa-solid fa-file-csv text-emerald-300"></i> Download CSV
-        </a>
-        <a href="/download/json" class="cta-ghost text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-1.5">
-          <i class="fa-solid fa-file-code text-amber-300"></i> Download JSON
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== INSIGHTS ===== -->
-  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    <div class="panel rounded-3xl p-6">
-      <p class="eyebrow mb-1">Insight 01</p>
-      <h3 class="display text-lg font-semibold text-white mb-5 flex items-center gap-2">
-        <i class="fa-solid fa-chart-simple text-sky-400 text-sm"></i> Storage impact on buyback
-      </h3>
-      {% if storage_insights %}
-      <div class="space-y-6">
-        {% for group in storage_insights %}
+  <!-- ===== PRICING INTELLIGENCE MATRIX TABLE ===== -->
+  <div class="card-white rounded-2xl overflow-hidden shadow-sm">
+    <!-- Filter Toolbar -->
+    <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-table-list"></i>
+        </div>
         <div>
-          <p class="text-xs font-semibold text-slate-300 mb-3">{{ group.model }}</p>
-          <div class="space-y-2.5">
-          {% for v in group.variants %}
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-[11px] text-slate-400 w-14 text-right shrink-0">{{ v.storage }}</span>
-              <div class="flex-1 h-2 bar-track rounded-full overflow-hidden">
-                <div class="bar-fill h-full rounded-full" style="width: {{ v.pct }}%"></div>
+          <h2 class="font-bold text-slate-900 text-sm">Pricing Intelligence Matrix</h2>
+          <span id="matrix-count-badge" class="text-xs text-slate-500 font-medium">{{ records|length }} records available</span>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="relative flex-1 sm:w-44">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input id="matrix-search" type="text" placeholder="Search model or defects..." oninput="filterMatrixTable()"
+                 class="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"/>
+        </div>
+
+        <select id="matrix-brand" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium">
+          <option value="">All Brands</option>
+          <option value="Apple">Apple</option>
+          <option value="Samsung">Samsung</option>
+        </select>
+
+        <select id="matrix-storage" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium">
+          <option value="">All Storages</option>
+          <option value="64 GB">64 GB</option>
+          <option value="128 GB">128 GB</option>
+          <option value="256 GB">256 GB</option>
+          <option value="512 GB">512 GB</option>
+          <option value="1 TB">1 TB</option>
+        </select>
+
+        <select id="matrix-grade" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium">
+          <option value="">All Grades</option>
+          <option value="Grade A">Grade A (Like New)</option>
+          <option value="Grade B">Grade B (Good)</option>
+          <option value="Grade C">Grade C (Fair)</option>
+          <option value="Grade D">Grade D (Broken)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="overflow-x-auto max-h-[580px] overflow-y-auto">
+      <table class="w-full text-left text-sm" id="matrix-table">
+        <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider sticky top-0 z-10">
+          <tr>
+            <th class="px-4 py-3">Brand</th>
+            <th class="px-4 py-3">Model & Specifications</th>
+            <th class="px-4 py-3">Storage</th>
+            <th class="px-4 py-3 text-right">Buyback Quote</th>
+            <th class="px-4 py-3">Grade</th>
+            <th class="px-4 py-3">Defects</th>
+            <th class="px-4 py-3 text-center">Data Origin</th>
+            <th class="px-4 py-3 text-right">Source</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="matrix-tbody">
+          {% for rec in records %}
+          {% set grade_letter = 'A' if 'Grade A' in rec.condition else ('B' if 'Grade B' in rec.condition else ('C' if 'Grade C' in rec.condition else 'D')) %}
+          <tr class="hover:bg-slate-50/70 transition matrix-row"
+              data-brand="{{ rec.brand }}"
+              data-model="{{ rec.model|lower }}"
+              data-storage="{{ rec.storage }}"
+              data-grade="Grade {{ grade_letter }}"
+              data-defects="{{ rec.defects|lower }}">
+            
+            <!-- Brand -->
+            <td class="px-4 py-3.5">
+              {% if rec.brand == 'Apple' %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                <i class="fa-brands fa-apple text-xs"></i> Apple
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <i class="fa-solid fa-mobile-screen text-xs"></i> Samsung
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Model & Specs -->
+            <td class="px-4 py-3.5">
+              <p class="font-bold text-slate-900">{{ rec.model.split('(')[0].strip() }}</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                {% if rec.ram %}
+                <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono border border-slate-200">{{ rec.ram }}</span>
+                {% endif %}
+                {% if rec.cores %}
+                <span class="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono border border-indigo-200">{{ rec.cores }} Cores</span>
+                {% endif %}
+                {% if rec.camera %}
+                <span class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono border border-emerald-200">{{ rec.camera }}</span>
+                {% endif %}
               </div>
-              <span class="num text-xs font-semibold text-white w-20 text-right shrink-0">₹{{ '{:,}'.format(v.buyback_price) }}</span>
-            </div>
+            </td>
+
+            <!-- Storage -->
+            <td class="px-4 py-3.5 font-mono text-xs font-semibold text-slate-700">
+              {{ rec.storage }}
+            </td>
+
+            <!-- Buyback Price -->
+            <td class="px-4 py-3.5 text-right">
+              <p class="font-bold text-slate-900 font-mono text-base">₹{{ '{:,}'.format(rec.buyback_price) }}</p>
+              <span class="text-[10px] text-slate-400 uppercase font-mono">{{ rec.currency or 'INR' }}</span>
+            </td>
+
+            <!-- Grade -->
+            <td class="px-4 py-3.5">
+              {% if grade_letter == 'A' %}
+              <span class="badge-active text-xs font-bold px-2.5 py-1 rounded-md">Grade A</span>
+              {% elif grade_letter == 'B' %}
+              <span class="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-2.5 py-1 rounded-md">Grade B</span>
+              {% elif grade_letter == 'C' %}
+              <span class="badge-paused text-xs font-bold px-2.5 py-1 rounded-md">Grade C</span>
+              {% else %}
+              <span class="badge-failed text-xs font-bold px-2.5 py-1 rounded-md">Grade D</span>
+              {% endif %}
+            </td>
+
+            <!-- Defects -->
+            <td class="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate" title="{{ rec.defects }}">
+              {{ rec.defects }}
+            </td>
+
+            <!-- Data Origin -->
+            <td class="px-4 py-3.5 text-center">
+              {% if rec.data_origin == 'verified_scraped' %}
+              <span class="badge-active text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-circle-check text-[10px]"></i> Verified Live
+              </span>
+              {% else %}
+              <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-chart-line text-[10px]"></i> Simulated Grade
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Source Link -->
+            <td class="px-4 py-3.5 text-right">
+              <a href="{{ rec.source_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs">
+                <span>Cashify</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </td>
+
+          </tr>
           {% endfor %}
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-sm text-slate-500 text-center py-10">Scrape devices to see storage impact analysis</p>
-      {% endif %}
+        </tbody>
+      </table>
     </div>
+  </div>
 
-    <div class="panel rounded-3xl p-6">
-      <p class="eyebrow mb-1">Insight 02</p>
-      <h3 class="display text-lg font-semibold text-white mb-5 flex items-center gap-2">
-        <i class="fa-solid fa-sliders text-violet-300 text-sm"></i> Condition degradation · iPhone 13 128GB
-      </h3>
-      {% if condition_insights %}
-      <div class="space-y-3">
-        {% for row in condition_insights %}
-        <div class="flex items-center gap-3">
-          <span class="{{ row.badge_class }} text-[11px] font-bold px-2 py-1 rounded-md w-20 text-center shrink-0">Grade {{ row.grade_letter }}</span>
-          <div class="flex-1 h-7 bar-track rounded-full overflow-hidden">
-            <div class="h-full {{ row.bar_class }} rounded-full flex items-center px-3" style="width: {{ row.pct }}%">
-              <span class="text-[11px] font-bold text-ink-950">{{ row.pct }}%</span>
-            </div>
-          </div>
-          <span class="num text-xs font-semibold text-white w-20 text-right shrink-0">₹{{ '{:,}'.format(row.buyback_price) }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-sm text-slate-500 text-center py-10">Scrape iPhone 13 data to see condition analysis</p>
-      {% endif %}
-    </div>
+</div>
+{% endblock %}
 
-  </section>
-
-  <footer class="pt-4 pb-8 text-center space-y-1">
-    <p class="eyebrow">Mobile Price Intelligence · POC</p>
-    <p class="text-xs text-slate-500">Data from <a href="https://www.cashify.in" target="_blank" class="text-sky-400 hover:underline">Cashify.in</a> and SwapUp public pricing pages · Flask + Python · Authorized scraping of public catalog pages only</p>
-  </footer>
-
-</main>
-
+{% block extra_scripts %}
 <script>
-let selectedUrl = "";
-
-function selectDevice(url, btn) {
-  selectedUrl = url;
-  document.getElementById("custom-url-input").value = url;
-  document.querySelectorAll(".device-card").forEach(b => b.classList.remove("is-active"));
-  btn.classList.add("is-active");
+function selectQuickDevice(url, btn) {
+  document.getElementById("quick-url-input").value = url;
+  document.querySelectorAll(".quick-device-btn").forEach(b => b.classList.remove("border-blue-500", "bg-blue-50"));
+  btn.classList.add("border-blue-500", "bg-blue-50");
 }
 
-function clearUrl() {
-  document.getElementById("custom-url-input").value = "";
-  selectedUrl = "";
-  document.querySelectorAll(".device-card").forEach(b => b.classList.remove("is-active"));
-}
-
-async function scrapeSingle() {
-  const url = document.getElementById("custom-url-input").value.trim();
+async function scrapeQuickSelected() {
+  const url = document.getElementById("quick-url-input").value.trim();
   if (!url) {
-    showToast("error", "No device selected", "Pick a device or enter a Cashify URL first.");
+    showToast("error", "Missing URL", "Select a device or paste a Cashify URL first.");
     return;
   }
-  showLoading("Scraping " + url.split("/").pop().replace(/-/g, " ") + "…");
+  showLoading("Scraping Selected Device...", "Extracting live quotes, saving historical snapshot, and detecting changes...");
   try {
     const res = await fetch("/api/scrape", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({url})
+      body: JSON.stringify({url: url})
     });
     const data = await res.json();
     hideLoading();
     if (data.success) {
-      showToast("success", "Scrape complete", data.message);
-      setTimeout(() => {
-        location.href = location.pathname + "?focus=" + encodeURIComponent(url);
-      }, 1500);
+      showToast("success", "Scrape Completed", data.message);
+      setTimeout(() => location.reload(), 1200);
     } else {
-      showToast("error", "Scrape failed", data.error || "Unknown error.");
+      showToast("error", "Scrape Failed", data.error || "Unknown error");
     }
-  } catch(e) {
+  } catch(err) {
     hideLoading();
-    showToast("error", "Network error", e.message);
+    showToast("error", "Network Error", err.message);
   }
 }
 
-async function scrapeAll() {
-  showLoading("Refreshing all catalog devices… this may take 30 seconds.");
+async function scrapeAllCatalog() {
+  showLoading("Refreshing All Catalog Devices...", "This execution will take 20-30 seconds across all registered devices.");
   try {
     const res = await fetch("/api/scrape-all", {method: "POST"});
     const data = await res.json();
     hideLoading();
     if (data.success) {
-      showToast("success", "Catalog refreshed", data.message);
-      setTimeout(() => location.reload(), 1800);
+      showToast("success", "Catalog Refreshed", data.message);
+      setTimeout(() => location.reload(), 1500);
     } else {
-      showToast("error", "Scrape failed", data.error || "Unknown error.");
+      showToast("error", "Refresh Failed", data.error || "Unknown error");
     }
-  } catch(e) {
+  } catch(err) {
     hideLoading();
-    showToast("error", "Network error", e.message);
+    showToast("error", "Network Error", err.message);
   }
 }
 
-function filterTable() {
-  const search = document.getElementById("search-input").value.toLowerCase();
-  const brand  = document.getElementById("filter-brand").value;
-  const origin = document.getElementById("filter-origin").value;
-  const grade  = document.getElementById("filter-grade").value;
-  const source = document.getElementById("filter-source").value;
-  const rows   = document.querySelectorAll("#table-body tr[data-brand]");
-  let visible = 0;
+function filterMatrixTable() {
+  const query   = document.getElementById("matrix-search").value.toLowerCase();
+  const brand   = document.getElementById("matrix-brand").value;
+  const storage = document.getElementById("matrix-storage").value;
+  const grade   = document.getElementById("matrix-grade").value;
+  const rows    = document.querySelectorAll(".matrix-row");
 
-  rows.forEach(row => {
-    const show =
-      (!search || row.dataset.model.toLowerCase().includes(search)) &&
-      (!brand  || row.dataset.brand === brand) &&
-      (!origin || row.dataset.origin === origin) &&
-      (!grade  || row.dataset.grade === grade) &&
-      (!source || row.dataset.source === source) &&
-      (!focusUrl || matchesFocus(row.dataset.url));
-    row.style.display = show ? "" : "none";
+  let visible = 0;
+  rows.forEach(r => {
+    const mQuery   = !query || r.dataset.model.includes(query) || r.dataset.defects.includes(query);
+    const mBrand   = !brand || r.dataset.brand === brand;
+    const mStorage = !storage || r.dataset.storage === storage;
+    const mGrade   = !grade || r.dataset.grade === grade;
+    const show = mQuery && mBrand && mStorage && mGrade;
+    r.style.display = show ? "" : "none";
     if (show) visible++;
   });
-
-  document.getElementById("focus-banner").classList.toggle("hidden", !focusUrl);
-  document.getElementById("visible-count").textContent = `Showing ${visible} of ${rows.length} records`;
-  document.getElementById("record-count-badge").textContent = `${visible} records`;
-
-  // Show the "no devices" prompt only when records exist but none match the filters
-  const emptyRow = document.getElementById("filter-empty-row");
-  emptyRow.classList.toggle("hidden", !(rows.length > 0 && visible === 0));
+  document.getElementById("matrix-count-badge").textContent = `${visible} records displayed`;
 }
-
-let focusUrl = "";
-
-function resetFilters() {
-  focusUrl = "";
-  history.replaceState(null, "", location.pathname);
-  document.getElementById("search-input").value = "";
-  document.getElementById("filter-brand").value = "";
-  document.getElementById("filter-origin").value = "";
-  document.getElementById("filter-grade").value = "";
-  document.getElementById("filter-source").value = "";
-  filterTable();
-}
-
-function showLoading(msg) {
-  document.getElementById("loading-msg").textContent = msg || "Loading…";
-  const o = document.getElementById("loading-overlay");
-  o.classList.remove("hidden");
-  o.classList.add("flex");
-}
-function hideLoading() {
-  const o = document.getElementById("loading-overlay");
-  o.classList.add("hidden");
-  o.classList.remove("flex");
-}
-
-let toastTimer;
-function showToast(type, title, msg) {
-  clearTimeout(toastTimer);
-  const toast = document.getElementById("toast");
-  const inner = document.getElementById("toast-inner");
-  const icon  = document.getElementById("toast-icon");
-
-  document.getElementById("toast-title").textContent = title;
-  document.getElementById("toast-msg").textContent   = msg;
-
-  const styles = {
-    success: ["bg-emerald-950/90 border-emerald-500/30", '<i class="fa-solid fa-circle-check text-emerald-400"></i>'],
-    error:   ["bg-rose-950/90 border-rose-500/30",       '<i class="fa-solid fa-circle-xmark text-rose-400"></i>'],
-    info:    ["bg-sky-950/90 border-sky-500/30",         '<i class="fa-solid fa-circle-info text-sky-400"></i>'],
-  };
-  const [cls, ic] = styles[type] || styles.info;
-  inner.className = "rounded-2xl shadow-2xl px-4 py-3 flex items-start gap-3 border backdrop-blur " + cls;
-  icon.innerHTML = ic;
-
-  toast.classList.remove("hidden");
-  toastTimer = setTimeout(hideToast, 6000);
-}
-function hideToast() {
-  document.getElementById("toast").classList.add("hidden");
-}
-
-function matchesFocus(rowUrl) {
-  // Matches the scraped URL itself, or its variants (e.g. ".../iphone-13" matches ".../iphone-13-128-gb")
-  if (!rowUrl) return false;
-  return rowUrl === focusUrl
-      || rowUrl.startsWith(focusUrl + "-")
-      || rowUrl.startsWith(focusUrl + "/");
-}
-
-function clearFocus() {
-  focusUrl = "";
-  history.replaceState(null, "", location.pathname);
-  filterTable();
-}
-
-function formatLocalTimes() {
-  const opts = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" };
-  let latest = null;
-
-  document.querySelectorAll(".js-localtime").forEach(el => {
-    const d = el.dataset.ts ? new Date(el.dataset.ts) : null;
-    if (d && !isNaN(d)) {
-      el.textContent = d.toLocaleString(undefined, opts);
-      el.title = d.toString();
-      if (!latest || d > latest) latest = d;
-    }
-  });
-
-  const latestEl = document.getElementById("latest-updated");
-  latestEl.textContent = latest
-    ? "Latest update: " + latest.toLocaleString(undefined, opts)
-    : "";
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const params = new URLSearchParams(location.search);
-  const focus = params.get("focus");
-  if (focus) {
-    focusUrl = focus.split("?")[0].replace(/\/$/, "");
-    document.getElementById("focus-label").textContent = focusUrl.split("/").pop();
-  }
-  formatLocalTimes();
-  filterTable();
-});
 </script>
-
-</body>
-</html>
+{% endblock %}

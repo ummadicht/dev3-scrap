@@ -56,8 +56,14 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Environments
+# Environments & Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.ppk
+*.key
+id_rsa*
 .venv
 env/
 venv/

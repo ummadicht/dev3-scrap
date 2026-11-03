@@ -312,45 +312,33 @@ class CashifyScraper:
         # 1. Discover variant URLs
         # --------------------------------------------------
         all_variant_urls = set()
-        # Extract variant links from HTML anchors.
-        for anchor in soup.find_all("a", href=True):
-            href = anchor["href"]
-            if (
-                "/sell-old-mobile-phone/" in href
-                and re.search(
-                    r"\d+-(?:gb|tb)",
-                    href,
-                    re.IGNORECASE,
-                )
-            ):
-                variant_url = urljoin(
-                    "https://www.cashify.in",
-                    href.split("?")[0],
-                )
-                all_variant_urls.add(variant_url)
-        # Extract variant URLs from serialized Next.js page data.
-        json_patterns = [
-            r'"url"\s*:\s*"/sell-old-mobile-phone/([^"]+)"',
-            r'\\"url\\"\s*:\s*\\"/sell-old-mobile-phone/([^\\"]+)',
-        ]
-        for pattern in json_patterns:
-            matches = re.findall(
-                pattern,
-                html,
-            )
-            for slug in matches:
-                if re.search(
-                    r"\d+-(?:gb|tb)",
-                    slug,
-                    re.IGNORECASE,
-                ):
-                    variant_url = urljoin(
-                        "https://www.cashify.in",
-                        "/sell-old-mobile-phone/" + slug,
-                    )
-                    all_variant_urls.add(
-                        variant_url.split("?")[0]
-                    )
+
+        # Priority 1: Extract variant links directly from explicit variant container elements [id*="variant"]
+        for li in soup.find_all(lambda tag: tag.has_attr('id') and 'variant' in tag.get('id', '')):
+            for a in li.find_all('a', href=True):
+                href = a['href']
+                if '/sell-old-mobile-phone/' in href:
+                    variant_url = urljoin('https://www.cashify.in', href.split('?')[0])
+                    all_variant_urls.add(variant_url)
+
+        # Priority 2: Extract from serialized Next.js productList if available
+        if not all_variant_urls:
+            pl_match = re.search(r'\\"productList\\":\[(.*?)\]', html)
+            if pl_match:
+                for slug in re.findall(r'\\"url\\":\\"/sell-old-mobile-phone/([^\\"\s]+)\\"', pl_match.group(1)):
+                    variant_url = urljoin('https://www.cashify.in', '/sell-old-mobile-phone/' + slug.split('?')[0])
+                    all_variant_urls.add(variant_url)
+
+        # Priority 3: Fallback to anchors containing storage tags that match the base device slug
+        if not all_variant_urls:
+            base_slug = url.rstrip('/').split('/')[-1].replace('used-', '')
+            base_keywords = [part for part in base_slug.split('-') if part not in ['5g', '4g', 'fe']]
+            for anchor in soup.find_all('a', href=True):
+                href = anchor['href']
+                if '/sell-old-mobile-phone/' in href and re.search(r'\d+-(?:gb|tb)', href, re.IGNORECASE):
+                    if any(kw in href.lower() for kw in base_keywords[:3]):
+                        variant_url = urljoin('https://www.cashify.in', href.split('?')[0])
+                        all_variant_urls.add(variant_url)
         # --------------------------------------------------
         # 2. Scrape discovered variants
         # --------------------------------------------------

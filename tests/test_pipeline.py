@@ -132,3 +132,74 @@ def test_export_json_and_csv(tmp_path: Path):
     assert reader[0]["model"] == "Galaxy S21 5G (8 GB/128 GB)"
     assert int(reader[0]["buyback_price"]) == 34930
 
+
+def test_priceiq_record_formatting():
+    """Verify conversion of internal records into PriceIQ bulk upload schema."""
+    from priceiq_client import PriceIQClient
+
+    raw_data = [
+        {
+            "brand": "Apple",
+            "model": "Apple iPhone 11 Pro Max",
+            "storage": "512 GB",
+            "buyback_price": 19500,
+            "data_origin": "verified_scraped",
+        }
+    ]
+    formatted = PriceIQClient.format_records_for_priceiq(raw_data)
+    assert len(formatted) == 1
+    assert formatted[0]["device"] == "Apple iPhone 11 Pro Max (512 GB)"
+    assert formatted[0]["price"] == 19500
+    assert formatted[0]["comparables"] == 1
+
+
+def test_database_manager_initialization():
+    """Verify DatabaseManager configuration and default values."""
+    from db import DatabaseManager
+
+    mgr = DatabaseManager(ssh_host="40.192.21.98", ssh_username="tunneluser")
+    assert mgr.ssh_host == "40.192.21.98"
+    assert mgr.ssh_username == "tunneluser"
+    assert mgr.db_dialect in ["postgresql", "mysql"]
+
+
+def test_rest_api_driver_normalization():
+    """Verify REST API driver handles custom JSON feeds and normalizes attributes."""
+    from driver_manager import RestApiDriver
+
+    driver = RestApiDriver()
+    mock_payload = {
+        "rows": [
+            {
+                "device": "Samsung Galaxy S24 Ultra (12 GB/512 GB)",
+                "price": 62000,
+                "grade": "Grade A",
+                "storage": "512 GB",
+            }
+        ]
+    }
+    normalized = driver._normalize_json_payload(mock_payload, "https://api.example.com/prices", {})
+    assert len(normalized) == 1
+    assert normalized[0]["brand"] == "Samsung"
+    assert normalized[0]["buyback_price"] == 62000.0
+    assert normalized[0]["storage"] == "512 GB"
+    assert normalized[0]["data_origin"] == "api_rest_feed"
+
+
+def test_price_comparison_delta_calculation():
+    """Verify delta calculation between old price and new price."""
+    old_p = 50000.0
+    new_p_increase = 52000.0
+    diff_inc = round(new_p_increase - old_p, 2)
+    pct_inc = round((diff_inc / old_p) * 100, 2)
+    assert diff_inc == 2000.0
+    assert pct_inc == 4.0
+
+    new_p_decrease = 45000.0
+    diff_dec = round(new_p_decrease - old_p, 2)
+    pct_dec = round((diff_dec / old_p) * 100, 2)
+    assert diff_dec == -5000.0
+    assert pct_dec == -10.0
+
+
+

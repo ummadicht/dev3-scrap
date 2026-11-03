@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block title %}Scraping Source Management • PriceIQ{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Section with Actions -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">Scraping Source Management</h1>
+      <p class="text-sm text-slate-500 mt-1">Configure and manage multiple websites, REST APIs, and bucket schedules.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="openAddModal()" class="btn-primary text-sm font-semibold px-4 py-2.5 rounded-xl inline-flex items-center gap-2 shadow-sm">
+        <i class="fa-solid fa-plus text-xs"></i> Add Scraping Source
+      </button>
+    </div>
+  </div>
+
+  <!-- Quick Metrics Overview -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Sources</span>
+      <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ stats.total_sources }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Websites & APIs</span>
+    </div>
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-xs font-bold text-emerald-700 uppercase tracking-wider block">Active Sources</span>
+      <p class="text-2xl font-extrabold text-emerald-600 mt-1">{{ stats.active_sources }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Scheduled & Ready</span>
+    </div>
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-xs font-bold text-amber-700 uppercase tracking-wider block">Paused Sources</span>
+      <p class="text-2xl font-extrabold text-amber-600 mt-1">{{ stats.paused_sources }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">Executions Suspended</span>
+    </div>
+    <div class="card-white rounded-2xl p-4">
+      <span class="text-xs font-bold text-blue-700 uppercase tracking-wider block">Total Executions</span>
+      <p class="text-2xl font-extrabold text-blue-600 mt-1">{{ stats.total_runs }}</p>
+      <span class="text-[11px] text-slate-400 mt-0.5 block">{{ stats.total_records_collected }} records snapshot</span>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="card-white rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2 flex-1">
+      <div class="relative flex-1 min-w-[200px]">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input id="source-search" type="text" placeholder="Search source name, bucket, or URL..." oninput="filterSourcesTable()"
+               class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition"/>
+      </div>
+      <select id="filter-status" onchange="filterSourcesTable()" class="py-2 pl-3 pr-8 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+        <option value="">All Statuses</option>
+        <option value="ACTIVE">Active</option>
+        <option value="PAUSED">Paused</option>
+        <option value="RUNNING">Running</option>
+        <option value="FAILED">Failed</option>
+      </select>
+      <select id="filter-type" onchange="filterSourcesTable()" class="py-2 pl-3 pr-8 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+        <option value="">All Source Types</option>
+        <option value="website_cashify">Website (Cashify)</option>
+        <option value="rest_api">REST API (JSON)</option>
+        <option value="generic_html">Generic HTML</option>
+      </select>
+    </div>
+    <span id="source-count-badge" class="text-xs font-bold text-slate-600 self-center">
+      Showing {{ sources|length }} sources
+    </span>
+  </div>
+
+  <!-- Sources Table -->
+  <div class="card-white rounded-2xl overflow-hidden shadow-sm">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm" id="sources-table">
+        <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+          <tr>
+            <th class="px-5 py-3.5">Source & Details</th>
+            <th class="px-5 py-3.5">Type & Bucket</th>
+            <th class="px-5 py-3.5">Status</th>
+            <th class="px-5 py-3.5">Last Scraped</th>
+            <th class="px-5 py-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="sources-tbody">
+          {% for src in sources %}
+          <tr class="hover:bg-slate-50/70 transition source-row"
+              data-name="{{ src.name|lower }}"
+              data-url="{{ src.target_url|lower }}"
+              data-bucket="{{ src.bucket_name|lower }}"
+              data-status="{{ src.status }}"
+              data-type="{{ src.source_type }}">
+            
+            <!-- Source Name & URL -->
+            <td class="px-5 py-4">
+              <p class="font-bold text-slate-900">{{ src.name }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs font-mono text-slate-500 truncate max-w-sm block" title="{{ src.target_url }}">
+                  {{ src.target_url }}
+                </span>
+                <a href="{{ src.target_url }}" target="_blank" rel="noopener" class="text-slate-400 hover:text-blue-600">
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                </a>
+              </div>
+            </td>
+
+            <!-- Source Type & Bucket -->
+            <td class="px-5 py-4">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-block mb-1">
+                {{ src.source_type }}
+              </span>
+              <p class="text-xs text-slate-500 font-mono">
+                <i class="fa-solid fa-box-archive text-[10px] mr-1 text-slate-400"></i>{{ src.bucket_name }}
+              </p>
+            </td>
+
+            <!-- Status Badge -->
+            <td class="px-5 py-4">
+              {% if src.status == 'ACTIVE' %}
+              <span class="badge-active text-xs font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+              </span>
+              {% elif src.status == 'PAUSED' %}
+              <span class="badge-paused text-xs font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Paused
+              </span>
+              {% elif src.status == 'RUNNING' %}
+              <span class="badge-running text-xs font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 animate-pulse">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Running
+              </span>
+              {% else %}
+              <span class="badge-failed text-xs font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Failed
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Last Scraped -->
+            <td class="px-5 py-4">
+              <p class="text-xs font-semibold text-slate-700">{{ src.last_scraped_at_fmt }}</p>
+              {% if src.last_status_message %}
+              <p class="text-[11px] text-slate-400 mt-0.5 truncate max-w-xs" title="{{ src.last_status_message }}">
+                {{ src.last_status_message }}
+              </p>
+              {% endif %}
+            </td>
+
+            <!-- Action Buttons -->
+            <td class="px-5 py-4 text-right">
+              <div class="inline-flex items-center gap-1.5">
+                <!-- Trigger Scrape Button -->
+                <button onclick="triggerScrape({{ src.id }}, '{{ src.name }}')"
+                        class="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition" title="Scrape Now">
+                  <i class="fa-solid fa-bolt text-sm"></i>
+                </button>
+
+                <!-- Pause/Resume Toggle -->
+                {% if src.status == 'PAUSED' %}
+                <button onclick="toggleStatus({{ src.id }}, 'ACTIVE')"
+                        class="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 transition" title="Resume Scraping">
+                  <i class="fa-solid fa-play text-sm"></i>
+                </button>
+                {% else %}
+                <button onclick="toggleStatus({{ src.id }}, 'PAUSED')"
+                        class="p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition" title="Pause Scraping">
+                  <i class="fa-solid fa-pause text-sm"></i>
+                </button>
+                {% endif %}
+
+                <!-- Edit Button -->
+                <button onclick='openEditModal({{ src|tojson }})'
+                        class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition" title="Edit Source">
+                  <i class="fa-solid fa-pen-to-square text-sm"></i>
+                </button>
+
+                <!-- Delete Button -->
+                <button onclick="deleteSource({{ src.id }}, '{{ src.name }}')"
+                        class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition" title="Delete Source">
+                  <i class="fa-solid fa-trash-can text-sm"></i>
+                </button>
+              </div>
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== ADD / EDIT SOURCE MODAL ===== -->
+<div id="source-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+      <h3 id="modal-title" class="text-lg font-bold text-slate-900">Add Scraping Source</h3>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form id="source-form" onsubmit="handleSourceSubmit(event)" class="mt-4 space-y-4">
+      <input type="hidden" id="form-source-id" value="">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Source Name</label>
+        <input type="text" id="form-name" required placeholder="e.g. Cashify Samsung S24 Ultra or PriceIQ Wholesale API"
+               class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"/>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Source Type</label>
+          <select id="form-type" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+            <option value="website_cashify">Website (Cashify)</option>
+            <option value="rest_api">REST API (JSON)</option>
+            <option value="generic_html">Generic HTML</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">HTTP Method</label>
+          <select id="form-method" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-medium">
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data Bucket</label>
+          <input type="text" id="form-bucket" required placeholder="e.g. cashify_buyback or wholesale_in"
+                 class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-mono"/>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
+          <input type="text" id="form-category" required value="Smartphones"
+                 class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"/>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target URL / API Endpoint</label>
+        <input type="url" id="form-url" required placeholder="https://www.cashify.in/sell-old-mobile-phone/used-..."
+               class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 font-mono text-xs"/>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Custom Headers (JSON)</label>
+        <textarea id="form-headers" rows="2" placeholder='{"Authorization": "Bearer ...", "User-Agent": "..."}'
+                  class="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"></textarea>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Authentication Config (JSON)</label>
+        <textarea id="form-auth" rows="2" placeholder='{"type": "bearer", "token": "..."}'
+                  class="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        <button type="button" onclick="closeModal()" class="btn-secondary text-sm font-semibold px-4 py-2 rounded-xl">Cancel</button>
+        <button type="submit" class="btn-primary text-sm font-semibold px-5 py-2 rounded-xl">Save Source</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function filterSourcesTable() {
+  const query  = document.getElementById("source-search").value.toLowerCase();
+  const status = document.getElementById("filter-status").value;
+  const type   = document.getElementById("filter-type").value;
+  const rows   = document.querySelectorAll(".source-row");
+
+  let visible = 0;
+  rows.forEach(r => {
+    const mQuery = !query || r.dataset.name.includes(query) || r.dataset.url.includes(query) || r.dataset.bucket.includes(query);
+    const mStatus = !status || r.dataset.status === status;
+    const mType   = !type || r.dataset.type === type;
+    const show = mQuery && mStatus && mType;
+    r.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+  document.getElementById("source-count-badge").textContent = `Showing ${visible} sources`;
+}
+
+function openAddModal() {
+  document.getElementById("modal-title").textContent = "Add Scraping Source";
+  document.getElementById("form-source-id").value = "";
+  document.getElementById("form-name").value = "";
+  document.getElementById("form-url").value = "";
+  document.getElementById("form-type").value = "website_cashify";
+  document.getElementById("form-method").value = "GET";
+  document.getElementById("form-bucket").value = "cashify_buyback";
+  document.getElementById("form-category").value = "Smartphones";
+  document.getElementById("form-headers").value = "";
+  document.getElementById("form-auth").value = "";
+
+  const modal = document.getElementById("source-modal");
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+}
+
+function openEditModal(src) {
+  document.getElementById("modal-title").textContent = "Edit Scraping Source";
+  document.getElementById("form-source-id").value = src.id;
+  document.getElementById("form-name").value = src.name || "";
+  document.getElementById("form-url").value = src.target_url || "";
+  document.getElementById("form-type").value = src.source_type || "website_cashify";
+  document.getElementById("form-method").value = src.http_method || "GET";
+  document.getElementById("form-bucket").value = src.bucket_name || "cashify_buyback";
+  document.getElementById("form-category").value = src.category || "Smartphones";
+  document.getElementById("form-headers").value = src.headers_json ? JSON.stringify(src.headers_json) : "";
+  document.getElementById("form-auth").value = src.auth_config_json ? JSON.stringify(src.auth_config_json) : "";
+
+  const modal = document.getElementById("source-modal");
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+}
+
+function closeModal() {
+  const modal = document.getElementById("source-modal");
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+}
+
+async function handleSourceSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById("form-source-id").value;
+  const payload = {
+    name: document.getElementById("form-name").value.trim(),
+    target_url: document.getElementById("form-url").value.trim(),
+    source_type: document.getElementById("form-type").value,
+    http_method: document.getElementById("form-method").value,
+    bucket_name: document.getElementById("form-bucket").value.trim(),
+    category: document.getElementById("form-category").value.trim(),
+    headers_json: parseJsonField(document.getElementById("form-headers").value),
+    auth_config_json: parseJsonField(document.getElementById("form-auth").value),
+  };
+
+  const url = id ? `/api/sources/${id}` : "/api/sources";
+  const method = id ? "PUT" : "POST";
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("success", "Source Saved", data.message);
+      closeModal();
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast("error", "Save Failed", data.error || "Unable to save source");
+    }
+  } catch(err) {
+    showToast("error", "Network Error", err.message);
+  }
+}
+
+function parseJsonField(text) {
+  if (!text || !text.trim()) return {};
+  try { return JSON.parse(text); } catch(e) { return {}; }
+}
+
+async function triggerScrape(id, name) {
+  showLoading(`Scraping ${name}...`, "Extracting live variant quotes & computing price variations...");
+  try {
+    const res = await fetch(`/api/sources/${id}/scrape`, {method: "POST"});
+    const data = await res.json();
+    hideLoading();
+    if (data.success) {
+      showToast("success", "Scrape Completed", `${data.records_scraped} records saved, ${data.changes_count} changes detected!`);
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast("error", "Scrape Failed", data.error || "Failed to execute source scrape");
+    }
+  } catch(err) {
+    hideLoading();
+    showToast("error", "Error", err.message);
+  }
+}
+
+async function toggleStatus(id, newStatus) {
+  try {
+    const res = await fetch(`/api/sources/${id}/status`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: newStatus})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("info", "Status Updated", `Source status is now ${newStatus}`);
+      setTimeout(() => location.reload(), 600);
+    }
+  } catch(err) {
+    showToast("error", "Error", err.message);
+  }
+}
+
+async function deleteSource(id, name) {
+  if (!confirm(`Are you sure you want to delete source "${name}"? Historical snapshots will be preserved.`)) return;
+  try {
+    const res = await fetch(`/api/sources/${id}`, {method: "DELETE"});
+    const data = await res.json();
+    if (data.success) {
+      showToast("success", "Source Deleted", data.message);
+      setTimeout(() => location.reload(), 600);
+    }
+  } catch(err) {
+    showToast("error", "Error", err.message);
+  }
+}
+</script>
+{% endblock %}
