@@ -284,24 +284,24 @@ def comparison_page():
 
         # Fallback to baseline records so comparison matrix is never blank/null
         if not comparisons:
-            current_records = load_records_from_storage()
-            comparisons = [
-                {
+            current_records = load_records()
+            for idx, r in enumerate(current_records[:150]):
+                price_val = float(r.get("buyback_price", 0))
+                ts_str = str(r.get("timestamp") or "")
+                comparisons.append({
                     "id": idx + 1,
-                    "device_identifier": f"{r.brand} {r.model} ({r.storage or 'Base'})",
-                    "brand": r.brand,
-                    "condition_grade": r.condition,
+                    "device_identifier": f"{r.get('brand', '')} {r.get('model', '')} ({r.get('storage') or 'Base'})",
+                    "brand": r.get("brand", "Unknown"),
+                    "condition_grade": r.get("condition", "Grade A"),
                     "old_price_fmt": "—",
-                    "new_price_fmt": f"₹{int(r.buyback_price):,}",
+                    "new_price_fmt": f"₹{int(price_val):,}",
                     "diff_fmt": "Baseline",
                     "badge_cls": "bg-sky-50 text-sky-700 border border-sky-200",
                     "change_type": "NEW",
                     "bucket_name": "cashify_buyback",
-                    "detected_at": r.timestamp,
-                    "detected_at_fmt": r.timestamp[:16].replace("T", " ") if isinstance(r.timestamp, str) else "Just now",
-                }
-                for idx, r in enumerate(current_records[:150])
-            ]
+                    "detected_at": ts_str,
+                    "detected_at_fmt": ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else "Just now",
+                })
             stats["new_items"] = len(comparisons)
 
         for c_item in comparisons:
