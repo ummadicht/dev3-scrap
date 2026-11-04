@@ -235,4 +235,40 @@ def test_api_test_connection_endpoint_validation():
     assert resp2.get_json()["success"] is False
 
 
+def test_upsert_records_with_dict_objects():
+    """Verify upsert_records safely processes dict items without model_dump error and updates timestamps."""
+    from app import upsert_records
+
+    existing = []
+    new_records = [
+        {
+            "brand": "Apple",
+            "model": "Apple iPhone 15",
+            "storage": "128 GB",
+            "condition": "Grade A: Like New",
+            "defects": "None",
+            "buyback_price": 45000,
+            "source_url": "https://example.com/test",
+            "data_origin": "verified_scraped",
+        }
+    ]
+
+    updated_existing, updated_count, added_count = upsert_records(existing, new_records)
+    assert added_count == 1
+    assert len(updated_existing) == 1
+    assert "timestamp" in updated_existing[0]
+    assert updated_existing[0]["brand"] == "Apple"
+
+
+def test_default_api_sources_configured():
+    """Verify DEFAULT_API_SOURCES contains WholeCellMarket and external API feeds."""
+    from config import DEFAULT_API_SOURCES
+
+    source_names = [s["name"] for s in DEFAULT_API_SOURCES]
+    assert any("WholeCellMarket" in name for name in source_names)
+    assert any("BackMarket" in name for name in source_names)
+    assert any("SellCell" in name for name in source_names)
+
+
+
 

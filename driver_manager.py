@@ -96,28 +96,49 @@ class RestApiDriver(BaseDriver):
                 auth_config = {}
 
         auth = None
+        if auth_config.get("token_url"):
+            import os
+            client_id = auth_config.get("client_id") or os.getenv(auth_config.get("client_id_env", "WHOLECELL_CLIENT_ID"), "")
+            client_secret = auth_config.get("client_secret") or os.getenv(auth_config.get("client_secret_env", "WHOLECELL_CLIENT_SECRET"), "")
+            if client_id and client_secret:
+                try:
+                    token_resp = requests.post(
+                        auth_config["token_url"],
+                        auth=(client_id, client_secret),
+                        data={"grant_type": "client_credentials"},
+                        timeout=10,
+                    )
+                    if token_resp.ok:
+                        token = token_resp.json().get("access_token")
+                        if token:
+                            headers["Authorization"] = f"Bearer {token}"
+                except Exception as t_err:
+                    logger.warning("Failed to obtain OAuth2 token from %s: %s", auth_config["token_url"], t_err)
+
         if auth_config.get("type") == "basic":
             auth = (auth_config.get("username", ""), auth_config.get("password", ""))
-        elif auth_config.get("type") == "bearer":
+        elif auth_config.get("type") == "bearer" and "Authorization" not in headers:
             token = auth_config.get("token", "")
             if token:
                 headers["Authorization"] = f"Bearer {token}"
 
         logger.info("Executing RestApiDriver [%s] %s...", method, url)
 
-        if method == "POST":
-            resp = requests.post(url, headers=headers, json=params, auth=auth, timeout=25)
-        else:
-            resp = requests.get(url, headers=headers, params=params, auth=auth, timeout=25)
+        try:
+            if method == "POST":
+                resp = requests.post(url, headers=headers, json=params, auth=auth, timeout=20)
+            else:
+                resp = requests.get(url, headers=headers, params=params, auth=auth, timeout=20)
 
-        if not resp.ok:
-            logger.error("REST API call failed [%d]: %s", resp.status_code, resp.text[:200])
-            resp.raise_for_status()
+            if not resp.ok:
+                logger.warning("REST API call failed [%d]: %s", resp.status_code, resp.text[:200])
+                return []
 
-        data = resp.json()
-
-        # Normalize diverse JSON formats into mobile pricing records
-        return self._normalize_json_payload(data, url, source)
+            data = resp.json()
+            return self._normalize_json_payload(data, url, source)
+        except Exception as exc:
+            logger.warning("RestApiDriver execution error for %s: %s", url, exc)
+            return []
 
     def _normalize_json_payload(self, data: Any, url: str, source: Dict[str, Any]) -> List[Dict[str, Any]]:
         records: List[Dict[str, Any]] = []

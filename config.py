@@ -176,6 +176,51 @@ TARGET_DEVICES = [
     },
 ]
 
+# Additional API Sources (WholeCellMarket, Wholesale & Buyback Feeds)
+DEFAULT_API_SOURCES = [
+    {
+        "name": "WholeCellMarket - PriceIQ Bulk Pricing API",
+        "source_type": "mobile_api",
+        "category": "Smartphones & Wholesale",
+        "bucket_name": "wholecell_wholesale",
+        "target_url": "https://wholecellmarket.com/apps/priceiq/api/prices/bulk",
+        "http_method": "POST",
+        "headers_json": {"Content-Type": "application/json"},
+        "auth_config_json": {
+            "type": "bearer",
+            "token_url": "https://wholecellmarket.com/apps/priceiq/api/oauth/token",
+            "client_id_env": "WHOLECELL_CLIENT_ID",
+            "client_secret_env": "WHOLECELL_CLIENT_SECRET",
+        },
+        "params_json": {"market": "IN", "channel": "wholesale"},
+        "status": "ACTIVE",
+    },
+    {
+        "name": "BackMarket - Buyback Pricing Partner API",
+        "source_type": "rest_api",
+        "category": "Refurbished Trade-In",
+        "bucket_name": "backmarket_buyback",
+        "target_url": "https://api.backmarket.com/v1/buyback/devices",
+        "http_method": "GET",
+        "headers_json": {"Accept": "application/json"},
+        "auth_config_json": {"type": "none"},
+        "params_json": {"country": "in", "category": "smartphones"},
+        "status": "ACTIVE",
+    },
+    {
+        "name": "SellCell - Global Mobile Price Intelligence API",
+        "source_type": "rest_api",
+        "category": "Smartphones",
+        "bucket_name": "sellcell_prices",
+        "target_url": "https://api.sellcell.com/v2/prices",
+        "http_method": "GET",
+        "headers_json": {"Accept": "application/json"},
+        "auth_config_json": {"type": "none"},
+        "params_json": {"limit": 50},
+        "status": "ACTIVE",
+    },
+]
+
 # HTTP Request Headers
 DEFAULT_HEADERS = {
     "User-Agent": (

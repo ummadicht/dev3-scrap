@@ -36,6 +36,7 @@ from config import (
     OUTPUT_JSON_PATH,
     REQUEST_TIMEOUT_SECONDS,
     TARGET_DEVICES,
+    DEFAULT_API_SOURCES,
 )
 from db import DatabaseManager
 from driver_manager import driver_manager
@@ -157,13 +158,24 @@ def compute_kpis(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def to_dict_record(rec: Any) -> Dict[str, Any]:
+    """Safely convert any Pydantic model or dict into a dictionary."""
+    if hasattr(rec, "model_dump"):
+        return rec.model_dump()
+    if hasattr(rec, "dict"):
+        return rec.dict()
+    if isinstance(rec, dict):
+        return copy.deepcopy(rec)
+    return dict(rec)
+
+
 def upsert_records(
     existing: List[Dict[str, Any]],
-    new_records: List[MobilePriceRecord],
+    new_records: List[Any],
     include_matrix: bool = True,
     target_urls: set = None,
 ) -> tuple:
-    """Upsert records cleanly in memory without duplicates."""
+    """Upsert records cleanly in memory without duplicates, safely handling both models and dicts."""
     if not include_matrix and target_urls:
         existing = [
             r for r in existing
@@ -180,10 +192,14 @@ def upsert_records(
     now_iso = datetime.utcnow().isoformat() + "+00:00"
 
     for rec in new_records:
-        rec_dict = rec.model_dump()
+        rec_dict = to_dict_record(rec)
         rec_dict["timestamp"] = now_iso
-        grade_prefix = rec.condition.split(":")[0].strip()
-        key = (rec.source_url, rec.storage, grade_prefix)
+        condition_str = rec_dict.get("condition", "") or ""
+        grade_prefix = condition_str.split(":")[0].strip()
+        source_url = rec_dict.get("source_url", "") or ""
+        storage = rec_dict.get("storage", "") or ""
+
+        key = (source_url, storage, grade_prefix)
         if key in existing_map:
             idx = existing_map[key]
             existing[idx].update(rec_dict)
@@ -243,7 +259,7 @@ def sources_page():
         sources = []
         stats = {"total_sources": 0, "active_sources": 0, "paused_sources": 0, "total_runs": 0, "total_records_collected": 0}
 
-    # Fallback to configured target devices so the page is never blank/null
+    # Fallback to configured target devices and API sources so the page is never blank/null
     if not sources:
         sources = [
             {
@@ -260,6 +276,20 @@ def sources_page():
             }
             for idx, dev in enumerate(TARGET_DEVICES)
         ]
+        base_id = len(sources)
+        for idx, api_s in enumerate(DEFAULT_API_SOURCES):
+            sources.append({
+                "id": base_id + idx + 1,
+                "name": api_s.get("name"),
+                "source_type": api_s.get("source_type", "rest_api"),
+                "category": api_s.get("category", "Smartphones"),
+                "bucket_name": api_s.get("bucket_name", "api_pricing"),
+                "target_url": api_s.get("target_url", ""),
+                "status": api_s.get("status", "ACTIVE"),
+                "schedule_interval_min": 1440,
+                "last_scraped_at": None,
+                "last_status_message": "Ready to scrape",
+            })
         stats["total_sources"] = len(sources)
         stats["active_sources"] = len(sources)
         stats["paused_sources"] = 0
@@ -626,7 +656,10 @@ def api_scrape():
             return jsonify({"success": False, "error": "No matching pricing records found."}), 404
 
         new_all = engine.build_full_dataset(all_verified, include_grading_matrix=include_matrix)
-        new_dicts = [r.model_dump() for r in new_all]
+        new_dicts = [to_dict_record(r) for r in new_all]
+        now_iso = datetime.utcnow().isoformat() + "+00:00"
+        for d in new_dicts:
+            d["timestamp"] = now_iso
 
         # 1. Historical bucket recording in PostgreSQL
         try:
@@ -640,7 +673,7 @@ def api_scrape():
 
         # 2. Update files
         existing = load_records()
-        scraped_urls = {r.source_url for r in all_verified}
+        scraped_urls = {r.source_url if hasattr(r, "source_url") else r.get("source_url") for r in all_verified}
         existing, updated_count, added_count = upsert_records(
             existing, new_all, include_matrix=include_matrix, target_urls=scraped_urls
         )
@@ -697,34 +730,27 @@ def api_scrape_all():
                     all_verified.extend(extracted)
             if all_verified:
                 full_dataset = engine.build_full_dataset(all_verified, include_grading_matrix=True)
-                all_records = [r.model_dump() for r in full_dataset]
+                all_records = [to_dict_record(r) for r in full_dataset]
 
         if not all_records:
             return jsonify({"success": False, "error": "No records extracted across sources."}), 404
 
+        now_iso = datetime.utcnow().isoformat() + "+00:00"
+        for r in all_records:
+            r["timestamp"] = now_iso
+
         # Historical run in PostgreSQL
         try:
-            run_id = db_manager.start_scrape_run(source_id=None, bucket_name="cashify_buyback")
-            db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="cashify_buyback", records=all_records)
-            changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="cashify_buyback", records=all_records)
+            run_id = db_manager.start_scrape_run(source_id=None, bucket_name="catalog_buyback")
+            db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="catalog_buyback", records=all_records)
+            changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="catalog_buyback", records=all_records)
             db_manager.finish_scrape_run(run_id, source_id=None, status="SUCCESS", records_count=len(all_records), changes_count=len(changes))
             db_manager.upsert_records(all_records)
         except Exception as db_err:
             logger.warning("DB logging error: %s", db_err)
 
         existing = load_records()
-        for r in all_records:
-            grade_prefix = r.get("condition", "").split(":")[0].strip()
-            key = (r.get("source_url", ""), r.get("storage", ""), grade_prefix)
-            found = False
-            for idx, ex in enumerate(existing):
-                if (ex.get("source_url"), ex.get("storage"), ex.get("condition", "").split(":")[0].strip()) == key:
-                    existing[idx].update(r)
-                    found = True
-                    break
-            if not found:
-                existing.append(r)
-
+        existing, u_count, a_count = upsert_records(existing, all_records, include_matrix=True)
         save_to_json(existing, OUTPUT_JSON_PATH)
         save_to_csv_raw(existing, OUTPUT_CSV_PATH)
 

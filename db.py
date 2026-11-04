@@ -320,36 +320,66 @@ class DatabaseManager:
     # =========================================================================
 
     def seed_default_sources_if_empty(self) -> int:
-        """Populates scraping_sources from TARGET_DEVICES in config.py if table is empty."""
-        from config import TARGET_DEVICES
+        """Populates scraping_sources from TARGET_DEVICES and DEFAULT_API_SOURCES if not already present."""
+        from config import TARGET_DEVICES, DEFAULT_API_SOURCES
 
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
             with conn.cursor() as cur:
                 schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
-                cur.execute("SELECT COUNT(*) FROM scraping_sources;")
-                count = cur.fetchone()[0]
-                if count > 0:
-                    return count
+                cur.execute("SELECT target_url FROM scraping_sources;")
+                existing_urls = {row[0] for row in cur.fetchall()}
 
-                logger.info("Seeding initial %d devices into scraping_sources...", len(TARGET_DEVICES))
                 inserted = 0
+
+                # 1. Seed Cashify targets if not present
                 for dev in TARGET_DEVICES:
-                    brand = dev.get("brand", "Unknown")
-                    family = dev.get("model_family", "Device")
-                    name = f"Cashify - {brand} {family}"
-                    url = dev.get("url", "")
-                    cur.execute("""
-                        INSERT INTO scraping_sources (
-                            name, source_type, category, bucket_name,
-                            target_url, http_method, status
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s);
-                    """, (name, "website_cashify", "Smartphones", "cashify_buyback", url, "GET", "ACTIVE"))
-                    inserted += 1
-                conn.commit()
-                logger.info("Seeded %d default scraping sources.", inserted)
-                return inserted
+                    url = dev.get("url", "").strip()
+                    if url and url not in existing_urls:
+                        brand = dev.get("brand", "Unknown")
+                        family = dev.get("model_family", "Device")
+                        name = f"Cashify - {brand} {family}"
+                        cur.execute("""
+                            INSERT INTO scraping_sources (
+                                name, source_type, category, bucket_name,
+                                target_url, http_method, status
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s);
+                        """, (name, "website_cashify", "Smartphones", "cashify_buyback", url, "GET", "ACTIVE"))
+                        existing_urls.add(url)
+                        inserted += 1
+
+                # 2. Seed WholeCellMarket & Other API Sources if not present
+                for api_src in DEFAULT_API_SOURCES:
+                    url = api_src.get("target_url", "").strip()
+                    if url and url not in existing_urls:
+                        cur.execute("""
+                            INSERT INTO scraping_sources (
+                                name, source_type, category, bucket_name,
+                                target_url, http_method, headers_json,
+                                auth_config_json, params_json, status
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s);
+                        """, (
+                            api_src.get("name"),
+                            api_src.get("source_type", "rest_api"),
+                            api_src.get("category", "Smartphones"),
+                            api_src.get("bucket_name", "api_pricing"),
+                            url,
+                            api_src.get("http_method", "GET"),
+                            json.dumps(api_src.get("headers_json", {})),
+                            json.dumps(api_src.get("auth_config_json", {})),
+                            json.dumps(api_src.get("params_json", {})),
+                            api_src.get("status", "ACTIVE"),
+                        ))
+                        existing_urls.add(url)
+                        inserted += 1
+
+                if inserted > 0:
+                    conn.commit()
+                    logger.info("Seeded %d new default sources into PostgreSQL.", inserted)
+
+                cur.execute("SELECT COUNT(*) FROM scraping_sources;")
+                return cur.fetchone()[0]
 
     def get_sources(self, status: Optional[str] = None, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch all registered scraping sources with optional filters."""
