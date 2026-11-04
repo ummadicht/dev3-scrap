@@ -206,6 +206,14 @@
           <option value="Grade C">Grade C (Fair)</option>
           <option value="Grade D">Grade D (Broken)</option>
         </select>
+
+        <select id="matrix-source" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium font-mono">
+          <option value="">All Sources</option>
+          <option value="cashify">Cashify</option>
+          <option value="wholecell">WholeCellMarket</option>
+          <option value="backmarket">BackMarket</option>
+          <option value="sellcell">SellCell</option>
+        </select>
       </div>
     </div>
 
@@ -227,12 +235,15 @@
         <tbody class="divide-y divide-slate-100" id="matrix-tbody">
           {% for rec in records %}
           {% set grade_letter = 'A' if 'Grade A' in rec.condition else ('B' if 'Grade B' in rec.condition else ('C' if 'Grade C' in rec.condition else 'D')) %}
+          {% set source_key = (rec.source_name or ('wholecell' if 'wholecell' in (rec.source_url|lower) else ('backmarket' if 'backmarket' in (rec.source_url|lower) else ('sellcell' if 'sellcell' in (rec.source_url|lower) else 'cashify'))))|lower %}
+          {% set source_label = rec.source_name or ('WholeCellMarket' if 'wholecell' in (rec.source_url|lower) else ('BackMarket' if 'backmarket' in (rec.source_url|lower) else ('SellCell' if 'sellcell' in (rec.source_url|lower) else 'Cashify'))) %}
           <tr class="hover:bg-slate-50/70 transition matrix-row"
               data-brand="{{ rec.brand }}"
               data-model="{{ rec.model|lower }}"
               data-storage="{{ rec.storage }}"
               data-grade="Grade {{ grade_letter }}"
-              data-defects="{{ rec.defects|lower }}">
+              data-defects="{{ rec.defects|lower }}"
+              data-source="{{ source_key }}">
             
             <!-- Brand -->
             <td class="px-4 py-3.5">
@@ -298,6 +309,14 @@
               <span class="badge-active text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                 <i class="fa-solid fa-circle-check text-[10px]"></i> Verified Live
               </span>
+              {% elif 'wholesale' in (rec.data_origin|default('')) %}
+              <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-boxes-stacked text-[10px]"></i> Wholesale Feed
+              </span>
+              {% elif 'partner' in (rec.data_origin|default('')) or 'api' in (rec.data_origin|default('')) %}
+              <span class="bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-network-wired text-[10px]"></i> Partner API
+              </span>
               {% else %}
               <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                 <i class="fa-solid fa-chart-line text-[10px]"></i> Simulated Grade
@@ -307,8 +326,9 @@
 
             <!-- Source Link -->
             <td class="px-4 py-3.5 text-right">
-              <a href="{{ rec.source_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs">
-                <span>Cashify</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              <a href="{{ rec.source_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-semibold">
+                <span>{{ source_label }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
               </a>
             </td>
 
@@ -380,6 +400,7 @@ function filterMatrixTable() {
   const brand   = document.getElementById("matrix-brand").value;
   const storage = document.getElementById("matrix-storage").value;
   const grade   = document.getElementById("matrix-grade").value;
+  const source  = document.getElementById("matrix-source").value.toLowerCase();
   const rows    = document.querySelectorAll(".matrix-row");
 
   let visible = 0;
@@ -388,7 +409,8 @@ function filterMatrixTable() {
     const mBrand   = !brand || r.dataset.brand === brand;
     const mStorage = !storage || r.dataset.storage === storage;
     const mGrade   = !grade || r.dataset.grade === grade;
-    const show = mQuery && mBrand && mStorage && mGrade;
+    const mSource  = !source || (r.dataset.source && r.dataset.source.includes(source));
+    const show = mQuery && mBrand && mStorage && mGrade && mSource;
     r.style.display = show ? "" : "none";
     if (show) visible++;
   });

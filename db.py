@@ -694,7 +694,7 @@ class DatabaseManager:
                     })
                     count += 1
                 conn.commit()
-                logger.info("Saved %d historical snapshots for run_id %d in bucket %s.", count, run_id, bucket_name)
+                logger.info("Saved %d historical snapshots for run_id %s in bucket %s.", count, run_id, bucket_name)
                 return count
 
     # =========================================================================
@@ -804,7 +804,7 @@ class DatabaseManager:
                     changes.append(change_entry)
 
                 conn.commit()
-                logger.info("Recorded %d price comparisons for run %d.", len(changes), run_id)
+                logger.info("Recorded %d price comparisons for run %s.", len(changes), run_id)
                 return changes
 
     # =========================================================================
@@ -942,6 +942,12 @@ class DatabaseManager:
             with conn.cursor() as cur:
                 schema = self.db_schema
                 cur.execute(f"SET search_path TO {schema}, public;")
+                try:
+                    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_device_variant_condition ON mobile_buyback_pricing (source_url, storage, condition);")
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+
                 query = """
                 INSERT INTO mobile_buyback_pricing (
                     brand, model, storage, ram, cores, camera,
@@ -964,23 +970,67 @@ class DatabaseManager:
                 """
 
                 for rec in records:
-                    cur.execute(query, {
-                        "brand": rec.get("brand", "Unknown"),
-                        "model": rec.get("model", "Unknown"),
-                        "storage": rec.get("storage", ""),
-                        "ram": rec.get("ram", ""),
-                        "cores": rec.get("cores", ""),
-                        "camera": rec.get("camera", ""),
-                        "condition": rec.get("condition", "Grade A"),
-                        "defects": rec.get("defects", "None"),
-                        "buyback_price": rec.get("buyback_price", 0),
-                        "currency": rec.get("currency", "INR"),
-                        "data_origin": rec.get("data_origin", "verified_scraped"),
-                        "confidence_score": rec.get("confidence_score", 1.0),
-                        "source_url": rec.get("source_url", ""),
-                        "timestamp": rec.get("timestamp"),
-                    })
-                    inserted_or_updated += 1
+                    try:
+                        cur.execute(query, {
+                            "brand": rec.get("brand", "Unknown"),
+                            "model": rec.get("model", "Unknown"),
+                            "storage": rec.get("storage", ""),
+                            "ram": rec.get("ram", ""),
+                            "cores": rec.get("cores", ""),
+                            "camera": rec.get("camera", ""),
+                            "condition": rec.get("condition", "Grade A"),
+                            "defects": rec.get("defects", "None"),
+                            "buyback_price": rec.get("buyback_price", 0),
+                            "currency": rec.get("currency", "INR"),
+                            "data_origin": rec.get("data_origin", "verified_scraped"),
+                            "confidence_score": rec.get("confidence_score", 1.0),
+                            "source_url": rec.get("source_url", ""),
+                            "timestamp": rec.get("timestamp"),
+                        })
+                        inserted_or_updated += 1
+                    except Exception:
+                        conn.rollback()
+                        # Fallback simple update/insert
+                        cur.execute("""
+                            UPDATE mobile_buyback_pricing
+                            SET buyback_price = %(buyback_price)s, scraped_at = %(timestamp)s
+                            WHERE source_url = %(source_url)s AND storage = %(storage)s AND condition = %(condition)s;
+                        """, {
+                            "buyback_price": rec.get("buyback_price", 0),
+                            "timestamp": rec.get("timestamp"),
+                            "source_url": rec.get("source_url", ""),
+                            "storage": rec.get("storage", ""),
+                            "condition": rec.get("condition", "Grade A"),
+                        })
+                        if cur.rowcount == 0:
+                            cur.execute("""
+                                INSERT INTO mobile_buyback_pricing (
+                                    brand, model, storage, ram, cores, camera,
+                                    condition, defects, buyback_price, currency,
+                                    data_origin, confidence_score, source_url, scraped_at
+                                ) VALUES (
+                                    %(brand)s, %(model)s, %(storage)s, %(ram)s, %(cores)s, %(camera)s,
+                                    %(condition)s, %(defects)s, %(buyback_price)s, %(currency)s,
+                                    %(data_origin)s, %(confidence_score)s, %(source_url)s, %(timestamp)s
+                                );
+                            """, {
+                                "brand": rec.get("brand", "Unknown"),
+                                "model": rec.get("model", "Unknown"),
+                                "storage": rec.get("storage", ""),
+                                "ram": rec.get("ram", ""),
+                                "cores": rec.get("cores", ""),
+                                "camera": rec.get("camera", ""),
+                                "condition": rec.get("condition", "Grade A"),
+                                "defects": rec.get("defects", "None"),
+                                "buyback_price": rec.get("buyback_price", 0),
+                                "currency": rec.get("currency", "INR"),
+                                "data_origin": rec.get("data_origin", "verified_scraped"),
+                                "confidence_score": rec.get("confidence_score", 1.0),
+                                "source_url": rec.get("source_url", ""),
+                                "timestamp": rec.get("timestamp"),
+                            })
+                        inserted_or_updated += 1
+                        conn.commit()
 
             conn.commit()
             logger.info("Successfully upserted %d records to central DB mirror table.", inserted_or_updated)
