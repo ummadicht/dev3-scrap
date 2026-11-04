@@ -247,6 +247,139 @@ def index():
     )
 
 
+@app.route("/rate-card/<slug>")
+def rate_card_page(slug: str):
+    """Dedicated public Wholesale Rate Card & device evaluation view (Zero login required)."""
+    records = load_records()
+    slug_clean = slug.strip().lower()
+
+    # Find matching device
+    matched_record = None
+    for r in records:
+        m = r.get("model", "").lower()
+        m_slug = re.sub(r"[^a-z0-9]+", "-", m).strip("-")
+        if m_slug == slug_clean or slug_clean in m_slug or m_slug in slug_clean:
+            matched_record = r
+            break
+
+    if not matched_record:
+        matched_record = records[0] if records else {
+            "model": "Apple iPhone 16 (8 GB/128 GB)",
+            "brand": "Apple",
+            "storage": "128 GB",
+            "buyback_price": 53500,
+        }
+
+    device_name = matched_record.get("model", "Mobile Device")
+    storage = matched_record.get("storage", "Standard")
+    base_price = float(matched_record.get("buyback_price", 50000))
+
+    tiers = [
+        {
+            "grade": "A",
+            "tier_name": "Grade A: Like New / Flawless",
+            "factor": 1.00,
+            "price": int(round(base_price)),
+            "description": "Like New / Flawless - 100% functional, zero scratches, battery health > 85%",
+            "defects": "None (Pristine condition)",
+        },
+        {
+            "grade": "B",
+            "tier_name": "Grade B: Good / Minor Wear",
+            "factor": 0.88,
+            "price": int(round(base_price * 0.88)),
+            "description": "Good - Fully functional, minor hairline scratches on body/frame, no dents",
+            "defects": "Minor cosmetic hairline scratches",
+        },
+        {
+            "grade": "C",
+            "tier_name": "Grade C: Average / Fair",
+            "factor": 0.72,
+            "price": int(round(base_price * 0.72)),
+            "description": "Average - Fully functional, moderate scratches and minor body dent, battery < 80%",
+            "defects": "Noticeable scratches, minor casing dent, degraded battery",
+        },
+        {
+            "grade": "D",
+            "tier_name": "Grade D: Defective / Broken",
+            "factor": 0.45,
+            "price": int(round(base_price * 0.45)),
+            "description": "Defective - Cracks on front display or non-functional camera/touch",
+            "defects": "Cracked front glass / Touchscreen defect",
+        },
+    ]
+
+    return render_template(
+        "rate_card.html",
+        device_name=device_name,
+        storage=storage,
+        base_quote=int(round(base_price)),
+        tiers=tiers,
+        slug=slug,
+    )
+
+
+@app.route("/api/rate-card/download")
+def api_download_rate_card():
+    """Download single device rate card or full matrix CSV."""
+    import csv
+    import io
+    from flask import Response
+
+    slug = request.args.get("slug", "")
+    records = load_records()
+    matched = None
+    for r in records:
+        m = r.get("model", "").lower()
+        m_slug = re.sub(r"[^a-z0-9]+", "-", m).strip("-")
+        if m_slug == slug or slug in m_slug:
+            matched = r
+            break
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Brand", "Model", "Storage", "Grade A (Like New)", "Grade B (Good)", "Grade C (Fair)", "Grade D (Broken)", "Market", "Channel", "Currency"])
+
+    if matched:
+        base_p = float(matched.get("buyback_price", 50000))
+        writer.writerow([
+            matched.get("brand", "Apple"),
+            matched.get("model", "Device"),
+            matched.get("storage", "128 GB"),
+            int(round(base_p)),
+            int(round(base_p * 0.88)),
+            int(round(base_p * 0.72)),
+            int(round(base_p * 0.45)),
+            "IN",
+            "wholesale",
+            "INR",
+        ])
+        filename = f"rate_card_{slug or 'device'}.csv"
+    else:
+        for r in records:
+            p = float(r.get("buyback_price", 0))
+            writer.writerow([
+                r.get("brand", ""),
+                r.get("model", ""),
+                r.get("storage", ""),
+                int(round(p)),
+                int(round(p * 0.88)),
+                int(round(p * 0.72)),
+                int(round(p * 0.45)),
+                "IN",
+                "wholesale",
+                "INR",
+            ])
+        filename = "partner_rate_card_matrix.csv"
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @app.route("/sources")
 def sources_page():
     """Dedicated Scraping Source Management interface."""

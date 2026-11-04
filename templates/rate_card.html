@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}{{ device_name }} - PriceIQ Wholesale Rate Card{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Breadcrumb & Navigation -->
+  <div class="flex items-center justify-between">
+    <nav class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+      <a href="/" class="hover:text-blue-600 transition flex items-center gap-1">
+        <i class="fa-solid fa-arrow-left text-[10px]"></i> Dashboard
+      </a>
+      <span>/</span>
+      <span class="text-slate-400">WholeCellMarket Rate Cards</span>
+      <span>/</span>
+      <span class="text-slate-900 font-bold">{{ device_name }}</span>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <a href="/api/rate-card/download?slug={{ slug }}" class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-file-csv text-emerald-600"></i> Download Rate Card CSV
+      </a>
+      <a href="https://thesuperiq.com/partner/rate-cards" target="_blank" rel="noopener" class="btn-primary px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm" title="Upload on SuperIQ Partner Portal">
+        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> SuperIQ Partner Portal
+      </a>
+    </div>
+  </div>
+
+  <!-- Device Overview Hero Card -->
+  <div class="card-white rounded-2xl p-6 relative overflow-hidden">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      
+      <!-- Device Identity -->
+      <div class="space-y-2">
+        <div class="inline-flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <i class="fa-solid fa-boxes-stacked mr-1"></i> WholeCellMarket Wholesale Feed
+          </span>
+          <span class="badge-active text-xs font-bold px-2.5 py-0.5 rounded-full">
+            Market: India (IN)
+          </span>
+          <span class="bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+            Channel: B2B Wholesale
+          </span>
+        </div>
+
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ device_name }}</h1>
+        <p class="text-sm text-slate-500">
+          Storage: <span class="font-bold text-slate-800">{{ storage or 'Standard' }}</span> &bull; 
+          Source: <span class="font-bold text-slate-800">PriceIQ Wholesale Engine</span> &bull; 
+          Currency: <span class="font-mono font-bold text-slate-800">INR (₹)</span>
+        </p>
+      </div>
+
+      <!-- Benchmark Price Banner -->
+      <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right min-w-[220px]">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Grade A Max Buyback</p>
+        <p class="text-3xl font-extrabold text-blue-600 font-mono mt-1">₹{{ '{:,}'.format(base_quote) }}</p>
+        <span class="text-[11px] text-emerald-600 font-semibold inline-flex items-center gap-1 mt-0.5">
+          <i class="fa-solid fa-circle-check text-[10px]"></i> 100% Verified Wholesale Baseline
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 4-Tier Condition & Defect Rate Card Matrix -->
+  <div class="card-white rounded-2xl overflow-hidden shadow-sm">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <div>
+        <h2 class="font-bold text-base text-slate-900">4-Tier Condition Grading Rate Card</h2>
+        <p class="text-xs text-slate-500">Wholesale quotes calibrated against physical cosmetic condition and hardware testing.</p>
+      </div>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-mono">
+        4 Grading Tiers
+      </span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      {% for tier in tiers %}
+      <div class="p-5 hover:bg-slate-50/60 transition flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        <!-- Tier Info -->
+        <div class="flex items-start gap-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shadow-sm shrink-0
+                      {% if tier.grade == 'A' %}bg-emerald-100 text-emerald-700 border border-emerald-300
+                      {% elif tier.grade == 'B' %}bg-blue-100 text-blue-700 border border-blue-300
+                      {% elif tier.grade == 'C' %}bg-amber-100 text-amber-700 border border-amber-300
+                      {% else %}bg-rose-100 text-rose-700 border border-rose-300{% endif %}">
+            {{ tier.grade }}
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-bold text-slate-900 text-sm">{{ tier.tier_name }}</h3>
+              <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                Factor: {{ tier.factor }}x
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1">{{ tier.description }}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+              <span class="font-semibold text-slate-500">Permitted Defects:</span> {{ tier.defects }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Buyback Quote for this tier -->
+        <div class="text-right shrink-0">
+          <p class="text-xl font-extrabold text-slate-900 font-mono">₹{{ '{:,}'.format(tier.price) }}</p>
+          <span class="text-[10px] text-slate-400 font-mono uppercase">Wholesale Quote</span>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- SuperIQ Platform Integration Notice -->
+  <div class="p-5 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-sm">
+        <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+      </div>
+      <div>
+        <h4 class="font-bold text-slate-900 text-sm">Partner Rate Card Upload Integration</h4>
+        <p class="text-xs text-slate-600">
+          To publish this rate card directly to SuperIQ, sign in using your partner credentials at 
+          <a href="https://thesuperiq.com/partner/rate-cards" target="_blank" rel="noopener" class="text-blue-600 underline font-semibold hover:text-blue-800">thesuperiq.com/partner/rate-cards</a>
+          using the pre-formatted rate card matrix file.
+        </p>
+      </div>
+    </div>
+    <a href="https://thesuperiq.com/partner/rate-cards" target="_blank" rel="noopener" class="btn-primary px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0">
+      <span>Open Partner Upload</span>
+      <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+    </a>
+  </div>
+
+</div>
+{% endblock %}
