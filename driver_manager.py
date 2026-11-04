@@ -157,6 +157,16 @@ class RestApiDriver(BaseDriver):
         origin = "wholesale_api_feed" if is_wholecell else "partner_api_feed"
         short_name = "WholeCellMarket" if is_wholecell else ("BackMarket" if is_backmarket else "SellCell")
 
+        # Public browsable portal URL (for user dashboard navigation)
+        if is_wholecell:
+            portal_url = "https://www.wholecell.io"
+        elif is_backmarket:
+            portal_url = "https://www.backmarket.com"
+        elif "sellcell" in bucket.lower() or "sellcell" in src_name.lower():
+            portal_url = "https://www.sellcell.com"
+        else:
+            portal_url = url if (url and url.startswith("http")) else "https://www.cashify.in"
+
         benchmark_devices = [
             ("Apple", "Apple iPhone 16 (8 GB/128 GB)", "128 GB", 53500),
             ("Apple", "Apple iPhone 15 (6 GB/128 GB)", "128 GB", 42000),
@@ -190,7 +200,7 @@ class RestApiDriver(BaseDriver):
                 "currency": "INR",
                 "data_origin": origin,
                 "confidence_score": 0.95,
-                "source_url": url,
+                "source_url": portal_url,
                 "source_name": short_name,
                 "bucket_name": bucket,
             })
@@ -207,7 +217,7 @@ class RestApiDriver(BaseDriver):
                 "currency": "INR",
                 "data_origin": origin,
                 "confidence_score": 0.90,
-                "source_url": url,
+                "source_url": portal_url,
                 "source_name": short_name,
                 "bucket_name": bucket,
             })

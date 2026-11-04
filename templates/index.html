@@ -326,7 +326,8 @@
 
             <!-- Source Link -->
             <td class="px-4 py-3.5 text-right">
-              <a href="{{ rec.source_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-semibold">
+              {% set browsable_url = 'https://www.wholecell.io' if ('wholecell' in (rec.source_url|lower or '') or 'wholecell' in (source_label|lower or '')) else ('https://www.backmarket.com' if ('backmarket' in (rec.source_url|lower or '') or 'backmarket' in (source_label|lower or '')) else ('https://www.sellcell.com' if ('sellcell' in (rec.source_url|lower or '') or 'sellcell' in (source_label|lower or '')) else rec.source_url)) %}
+              <a href="{{ browsable_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-semibold" title="Open {{ source_label }} Portal">
                 <span>{{ source_label }}</span>
                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
               </a>
