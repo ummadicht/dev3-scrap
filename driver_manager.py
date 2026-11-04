@@ -182,7 +182,7 @@ class RestApiDriver(BaseDriver):
             return f"https://www.backmarket.com/en-us/search?q={urllib.parse.quote_plus(clean)}"
 
         if 'wholecell' in p:
-            return f"https://www.wholecell.io/?s={urllib.parse.quote_plus(clean)}"
+            return f"https://thesuperiq.com/apps/priceiq/programs?market=IN&search={urllib.parse.quote_plus(clean)}"
 
         return "https://www.cashify.in"
 

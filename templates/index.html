@@ -341,10 +341,10 @@
                   {% set direct_url = 'https://www.backmarket.com/en-us/search?q=' ~ (clean_m|urlencode) %}
                 {% endif %}
               {% elif 'wholecell' in s_url|lower or 'wholecell' in source_label|lower %}
-                {% if '?s=' in s_url %}
+                {% if 'thesuperiq.com' in s_url %}
                   {% set direct_url = s_url %}
                 {% else %}
-                  {% set direct_url = 'https://www.wholecell.io/?s=' ~ (clean_m|urlencode) %}
+                  {% set direct_url = 'https://thesuperiq.com/apps/priceiq/programs?market=IN&search=' ~ (clean_m|urlencode) %}
                 {% endif %}
               {% else %}
                 {% set direct_url = s_url or 'https://www.cashify.in' %}

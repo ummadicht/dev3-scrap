@@ -2956,7 +2956,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+13",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Apple+iPhone+13",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -2974,7 +2974,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+13",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Apple+iPhone+13",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -2992,7 +2992,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+11",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Apple+iPhone+11",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3010,7 +3010,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+11",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Apple+iPhone+11",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3028,7 +3028,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io/?s=Samsung+Galaxy+Z+Flip+5",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Samsung+Galaxy+Z+Flip+5",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3046,7 +3046,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io/?s=Samsung+Galaxy+Z+Flip+5",
+    "source_url": "https://thesuperiq.com/apps/priceiq/programs?market=IN&search=Samsung+Galaxy+Z+Flip+5",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"

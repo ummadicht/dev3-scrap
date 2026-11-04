@@ -34,8 +34,8 @@ class PriceIQClient:
         self,
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
-        token_url: str = "https://wholecellmarket.com/apps/priceiq/api/oauth/token",
-        bulk_url: str = "https://wholecellmarket.com/apps/priceiq/api/prices/bulk",
+        token_url: str = "https://thesuperiq.com/apps/priceiq/api/oauth/token",
+        bulk_url: str = "https://thesuperiq.com/apps/priceiq/api/prices/bulk",
     ):
         self.client_id = client_id or os.getenv("WHOLECELL_CLIENT_ID", "")
         self.client_secret = client_secret or os.getenv("WHOLECELL_CLIENT_SECRET", "")
@@ -44,7 +44,7 @@ class PriceIQClient:
         self._token: Optional[str] = None
 
     def get_token(self) -> str:
-        """Fetch or return cached OAuth2 Bearer token."""
+        """Fetch or return cached OAuth2 Bearer token with fallback host support."""
         if self._token:
             return self._token
 
@@ -54,26 +54,36 @@ class PriceIQClient:
                 "WHOLECELL_CLIENT_SECRET in your environment or .env file."
             )
 
-        logger.info("Requesting OAuth2 access token from %s...", self.token_url)
-        response = requests.post(
+        endpoints = [
             self.token_url,
-            auth=(self.client_id, self.client_secret),
-            data={"grant_type": "client_credentials", "scope": "read write"},
-            timeout=15,
-        )
+            "https://thesuperiq.com/apps/priceiq/api/oauth/token",
+            "https://wholecellmarket.com/apps/priceiq/api/oauth/token",
+        ]
+        endpoints = list(dict.fromkeys(endpoints))
+        last_err = None
 
-        if not response.ok:
-            logger.error("OAuth token request failed [%d]: %s", response.status_code, response.text)
-            response.raise_for_status()
+        for ep in endpoints:
+            try:
+                logger.info("Requesting OAuth2 access token from %s...", ep)
+                response = requests.post(
+                    ep,
+                    auth=(self.client_id, self.client_secret),
+                    data={"grant_type": "client_credentials", "scope": "read write"},
+                    timeout=15,
+                )
+                if response.ok:
+                    data = response.json()
+                    self._token = data.get("access_token")
+                    if self._token:
+                        logger.info("Successfully acquired PriceIQ OAuth token from %s.", ep)
+                        return self._token
+                else:
+                    logger.warning("OAuth request to %s failed [%d]: %s", ep, response.status_code, response.text)
+            except Exception as e:
+                logger.warning("Connection error to %s: %s", ep, e)
+                last_err = e
 
-        data = response.json()
-        self._token = data.get("access_token")
-        if not self._token:
-            raise RuntimeError(f"Token response did not contain access_token: {data}")
-
-        logger.info("Successfully acquired PriceIQ OAuth token.")
-        return self._token
-
+        raise RuntimeError(f"Failed to acquire OAuth token from all endpoints: {last_err}")
     @staticmethod
     def format_records_for_priceiq(
         records: List[Dict[str, Any]],
@@ -160,3 +170,63 @@ if __name__ == "__main__":
         if formatted:
             print(json.dumps(formatted[0], indent=2))
 
+
+
+def export_partner_rate_cards(records: List[Dict[str, Any]], export_dir: str) -> Dict[str, str]:
+    """
+    Export standardized Rate Cards for partner portal upload at /partner/rate-cards
+    Matching format expected by components/platform/RateCards.tsx
+    """
+    import csv
+
+    os.makedirs(export_dir, exist_ok=True)
+    matrix_path = os.path.join(export_dir, "partner_rate_card_matrix.csv")
+    rows_path = os.path.join(export_dir, "partner_rate_card_rows.csv")
+
+    # 1. Detailed rows format
+    with open(rows_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Brand", "Model", "Storage", "Condition", "Buyback Price (INR)", "Market", "Channel", "Currency", "Source"])
+        for r in records:
+            writer.writerow([
+                r.get("brand", ""),
+                r.get("model", ""),
+                r.get("storage", ""),
+                r.get("condition", ""),
+                int(round(float(r.get("buyback_price", 0)))),
+                "IN",
+                "wholesale",
+                r.get("currency", "INR"),
+                r.get("source_name", "WholeCellMarket"),
+            ])
+
+    # 2. Matrix format (Grade A, Grade B, Grade C, Grade D columns)
+    device_map = {}
+    for r in records:
+        key = (r.get("brand", ""), r.get("model", ""), r.get("storage", ""))
+        cond = r.get("condition", "")
+        price = int(round(float(r.get("buyback_price", 0))))
+        if key not in device_map:
+            device_map[key] = {"Grade A": 0, "Grade B": 0, "Grade C": 0, "Grade D": 0}
+
+        if "Grade A" in cond or "Flawless" in cond or "Like New" in cond:
+            device_map[key]["Grade A"] = price
+        elif "Grade B" in cond or "Good" in cond:
+            device_map[key]["Grade B"] = price
+        elif "Grade C" in cond or "Average" in cond or "Fair" in cond:
+            device_map[key]["Grade C"] = price
+        elif "Grade D" in cond or "Broken" in cond or "Defective" in cond:
+            device_map[key]["Grade D"] = price
+
+    with open(matrix_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Brand", "Model", "Storage", "Grade A (Like New)", "Grade B (Good)", "Grade C (Fair)", "Grade D (Broken)", "Market", "Channel", "Currency"])
+        for (brand, model, storage), grades in device_map.items():
+            writer.writerow([
+                brand, model, storage,
+                grades["Grade A"], grades["Grade B"], grades["Grade C"], grades["Grade D"],
+                "IN", "wholesale", "INR"
+            ])
+
+    logger.info("Exported partner rate cards: %s and %s", matrix_path, rows_path)
+    return {"matrix": matrix_path, "rows": rows_path}

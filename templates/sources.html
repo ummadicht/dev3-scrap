@@ -101,7 +101,7 @@
                 <span class="text-xs font-mono text-slate-500 truncate max-w-sm block" title="{{ src.target_url }}">
                   {{ src.target_url }}
                 </span>
-                {% set browsable_url = 'https://www.wholecell.io' if ('wholecell' in (src.target_url|lower or '') or 'wholecell' in (src.name|lower or '')) else ('https://www.backmarket.com' if ('backmarket' in (src.target_url|lower or '') or 'backmarket' in (src.name|lower or '')) else ('https://www.sellcell.com' if ('sellcell' in (src.target_url|lower or '') or 'sellcell' in (src.name|lower or '')) else src.target_url)) %}
+                {% set browsable_url = 'https://thesuperiq.com/apps/priceiq/programs?market=IN' if ('wholecell' in (src.target_url|lower or '') or 'wholecell' in (src.name|lower or '')) else ('https://www.backmarket.com' if ('backmarket' in (src.target_url|lower or '') or 'backmarket' in (src.name|lower or '')) else ('https://www.sellcell.com' if ('sellcell' in (src.target_url|lower or '') or 'sellcell' in (src.name|lower or '')) else src.target_url)) %}
                 <a href="{{ browsable_url }}" target="_blank" rel="noopener" class="text-slate-400 hover:text-blue-600" title="Open Public Website">
                   <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
                 </a>
