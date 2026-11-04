@@ -2956,7 +2956,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+13",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -2974,7 +2974,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+13",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -2992,7 +2992,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+11",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3010,7 +3010,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Apple+iPhone+11",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3028,7 +3028,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Samsung+Galaxy+Z+Flip+5",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3046,7 +3046,7 @@
     "currency": "INR",
     "data_origin": "wholesale_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.wholecell.io",
+    "source_url": "https://www.wholecell.io/?s=Samsung+Galaxy+Z+Flip+5",
     "source_name": "WholeCellMarket",
     "bucket_name": "wholecell_wholesale",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3064,7 +3064,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Apple+iPhone+13",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3082,7 +3082,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Apple+iPhone+13",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3100,7 +3100,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Apple+iPhone+11",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3118,7 +3118,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Apple+iPhone+11",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3136,7 +3136,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Samsung+Galaxy+Z+Flip+5",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3154,7 +3154,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.backmarket.com",
+    "source_url": "https://www.backmarket.com/en-us/search?q=Samsung+Galaxy+Z+Flip+5",
     "source_name": "BackMarket",
     "bucket_name": "backmarket_buyback",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3172,7 +3172,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/apple-iphone-13/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3190,7 +3190,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/apple-iphone-13/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3208,7 +3208,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/apple-iphone-11/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3226,7 +3226,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/apple-iphone-11/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3244,7 +3244,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.95,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/samsung-galaxy-z-flip5/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"
@@ -3262,7 +3262,7 @@
     "currency": "INR",
     "data_origin": "partner_api_feed",
     "confidence_score": 0.9,
-    "source_url": "https://www.sellcell.com",
+    "source_url": "https://www.sellcell.com/phones/samsung-galaxy-z-flip5/",
     "source_name": "SellCell",
     "bucket_name": "sellcell_prices",
     "timestamp": "2026-11-04T06:06:26.184197+00:00"

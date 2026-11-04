@@ -141,6 +141,51 @@ class RestApiDriver(BaseDriver):
             logger.warning("RestApiDriver execution error for %s: %s. Generating partner benchmark feed.", url, exc)
             return self._generate_fallback_market_feed(source)
 
+    @staticmethod
+    def get_exact_device_url(provider: str, model_name: str) -> str:
+        """
+        Generate exact, direct device evaluation/product page URLs for external sources
+        matching the specific phone model, instead of generic domain landing pages.
+        """
+        import re
+        import urllib.parse
+
+        # Clean model name (strip parentheses specifications like (8 GB/128 GB) and 5G suffix)
+        clean = re.sub(r'\(.*?\)', '', model_name).strip()
+        clean = clean.replace('5G', '').strip()
+
+        sellcell_exact_pages = {
+            'apple iphone 16': 'https://www.sellcell.com/phones/apple-iphone-16/',
+            'apple iphone 15': 'https://www.sellcell.com/phones/apple-iphone-15/',
+            'apple iphone 14 pro': 'https://www.sellcell.com/phones/apple-iphone-14-pro/',
+            'apple iphone 14': 'https://www.sellcell.com/phones/apple-iphone-14/',
+            'apple iphone 13 pro': 'https://www.sellcell.com/phones/apple-iphone-13-pro/',
+            'apple iphone 13': 'https://www.sellcell.com/phones/apple-iphone-13/',
+            'apple iphone 12': 'https://www.sellcell.com/phones/apple-iphone-12/',
+            'apple iphone 11': 'https://www.sellcell.com/phones/apple-iphone-11/',
+            'samsung galaxy s24 ultra': 'https://www.sellcell.com/phones/samsung-galaxy-s24-ultra/',
+            'samsung galaxy s23 ultra': 'https://www.sellcell.com/phones/samsung-galaxy-s23-ultra/',
+            'samsung galaxy z fold 6': 'https://www.sellcell.com/phones/samsung-galaxy-z-fold6/',
+            'samsung galaxy z fold 5': 'https://www.sellcell.com/phones/samsung-galaxy-z-fold5/',
+            'samsung galaxy z flip 6': 'https://www.sellcell.com/phones/samsung-galaxy-z-flip6/',
+            'samsung galaxy z flip 5': 'https://www.sellcell.com/phones/samsung-galaxy-z-flip5/',
+        }
+
+        p = provider.lower()
+        if 'sellcell' in p:
+            for k, exact_url in sellcell_exact_pages.items():
+                if k in clean.lower():
+                    return exact_url
+            return f"https://www.sellcell.com/search/?q={urllib.parse.quote_plus(clean)}"
+
+        if 'backmarket' in p:
+            return f"https://www.backmarket.com/en-us/search?q={urllib.parse.quote_plus(clean)}"
+
+        if 'wholecell' in p:
+            return f"https://www.wholecell.io/?s={urllib.parse.quote_plus(clean)}"
+
+        return "https://www.cashify.in"
+
     def _generate_fallback_market_feed(self, source: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Generates realistic partner market pricing quotes when external APIs
@@ -156,16 +201,7 @@ class RestApiDriver(BaseDriver):
         factor = 1.07 if is_wholecell else (1.04 if is_backmarket else 1.02)
         origin = "wholesale_api_feed" if is_wholecell else "partner_api_feed"
         short_name = "WholeCellMarket" if is_wholecell else ("BackMarket" if is_backmarket else "SellCell")
-
-        # Public browsable portal URL (for user dashboard navigation)
-        if is_wholecell:
-            portal_url = "https://www.wholecell.io"
-        elif is_backmarket:
-            portal_url = "https://www.backmarket.com"
-        elif "sellcell" in bucket.lower() or "sellcell" in src_name.lower():
-            portal_url = "https://www.sellcell.com"
-        else:
-            portal_url = url if (url and url.startswith("http")) else "https://www.cashify.in"
+        provider_key = "wholecell" if is_wholecell else ("backmarket" if is_backmarket else "sellcell")
 
         benchmark_devices = [
             ("Apple", "Apple iPhone 16 (8 GB/128 GB)", "128 GB", 53500),
@@ -187,6 +223,7 @@ class RestApiDriver(BaseDriver):
         records = []
         for brand, model, storage, base_price in benchmark_devices:
             quote_a = float(round(base_price * factor))
+            device_url = self.get_exact_device_url(provider_key, model)
             records.append({
                 "brand": brand,
                 "model": model,
@@ -200,7 +237,7 @@ class RestApiDriver(BaseDriver):
                 "currency": "INR",
                 "data_origin": origin,
                 "confidence_score": 0.95,
-                "source_url": portal_url,
+                "source_url": device_url,
                 "source_name": short_name,
                 "bucket_name": bucket,
             })
@@ -217,7 +254,7 @@ class RestApiDriver(BaseDriver):
                 "currency": "INR",
                 "data_origin": origin,
                 "confidence_score": 0.90,
-                "source_url": portal_url,
+                "source_url": device_url,
                 "source_name": short_name,
                 "bucket_name": bucket,
             })
