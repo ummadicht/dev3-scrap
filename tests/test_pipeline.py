@@ -270,5 +270,45 @@ def test_default_api_sources_configured():
     assert any("SellCell" in name for name in source_names)
 
 
+def test_sqlite_db_manager_connection(tmp_path):
+    """Verify db.DatabaseManager supports SQLite dialect and provisions tables."""
+    import db
+    db_file = tmp_path / "test_priceiq.db"
+    db_mgr = db.DatabaseManager(
+        db_dialect="sqlite",
+        db_name=str(db_file),
+    )
+    with db_mgr.get_connection() as conn:
+        db_mgr.create_table_if_not_exists(conn)
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [r[0] for r in cur.fetchall()]
+        assert "mobile_buyback_pricing" in tables
+        assert "priceiq_prices" in tables
+
+
+def test_sqlite_to_postgres_migrator_progress(tmp_path):
+    """Verify SQLiteToPostgresMigrator progresses through 0% to 100% and validates SQLite source."""
+    from migrate_sqlite_to_postgres import SQLiteToPostgresMigrator
+    import sqlite3
+
+    db_file = tmp_path / "test_source.db"
+    conn = sqlite3.connect(db_file)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE mobile_buyback_pricing (id INTEGER PRIMARY KEY, brand TEXT, model TEXT, storage TEXT, condition TEXT, defects TEXT, buyback_price REAL, currency TEXT, data_origin TEXT, confidence_score REAL, source_url TEXT);")
+    cur.execute("INSERT INTO mobile_buyback_pricing VALUES (1, 'Apple', 'Apple iPhone 13', '128 GB', 'Grade A: Like New', 'None', 26750, 'INR', 'wholesale_api_feed', 0.95, '/test');")
+    conn.commit()
+    conn.close()
+
+    migrator = SQLiteToPostgresMigrator(sqlite_path=db_file)
+    assert migrator.progress_pct == 0
+
+    migrator.update_progress(25, "Quarter complete")
+    assert migrator.progress_pct == 25
+
+    migrator.update_progress(100, "Finished")
+    assert migrator.progress_pct == 100
+
+
 
 

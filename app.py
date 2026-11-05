@@ -975,5 +975,25 @@ def save_to_csv_raw(records: List[Dict[str, Any]], path: Path):
     logger.info("Exported %d records to %s", len(records), path)
 
 
+@app.route("/api/migrate/sqlite-to-postgres", methods=["POST"])
+def api_migrate_sqlite_to_postgres():
+    """Trigger PriceIQ SQLite to PostgreSQL migration with percentage progress report."""
+    from migrate_sqlite_to_postgres import SQLiteToPostgresMigrator, DEFAULT_SQLITE_PATH
+    data = request.get_json(silent=True) or {}
+    sqlite_file = data.get("sqlite_db") or str(DEFAULT_SQLITE_PATH)
+
+    try:
+        migrator = SQLiteToPostgresMigrator(sqlite_path=Path(sqlite_file), db_manager=db_manager)
+        result = migrator.run_migration()
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("SQLite migration API error: %s", exc)
+        return jsonify({
+            "status": "error",
+            "progress_pct": 0,
+            "error": str(exc),
+        }), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)

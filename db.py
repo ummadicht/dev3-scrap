@@ -150,6 +150,11 @@ class DatabaseManager:
                         user=self.db_user,
                         password=self.db_password,
                     )
+            elif self.db_dialect in ("sqlite", "sqlite3"):
+                import sqlite3
+                sqlite_path = self.database_url.replace("sqlite:///", "").replace("sqlite://", "") if self.database_url else self.db_name
+                conn = sqlite3.connect(sqlite_path)
+                conn.row_factory = sqlite3.Row
             elif self.db_dialect == "mysql":
                 import pymysql
                 conn = pymysql.connect(
@@ -314,6 +319,64 @@ class DatabaseManager:
 
             conn.commit()
             logger.info("Enterprise multi-source tables and indexes verified in schema %s.", schema)
+        elif self.db_dialect in ("sqlite", "sqlite3"):
+            cur = conn.cursor()
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS mobile_buyback_pricing (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand TEXT NOT NULL,
+                model TEXT NOT NULL,
+                storage TEXT,
+                ram TEXT,
+                cores TEXT,
+                camera TEXT,
+                condition TEXT NOT NULL,
+                defects TEXT,
+                buyback_price REAL NOT NULL,
+                currency TEXT DEFAULT 'INR',
+                data_origin TEXT,
+                confidence_score REAL,
+                source_url TEXT NOT NULL,
+                scraped_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (source_url, storage, condition)
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS scraping_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                source_type TEXT NOT NULL DEFAULT 'website_cashify',
+                category TEXT NOT NULL DEFAULT 'Smartphones',
+                bucket_name TEXT NOT NULL DEFAULT 'cashify_buyback',
+                target_url TEXT NOT NULL,
+                http_method TEXT NOT NULL DEFAULT 'GET',
+                headers_json TEXT DEFAULT '{}',
+                auth_config_json TEXT DEFAULT '{}',
+                params_json TEXT DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
+                schedule_interval_min INT DEFAULT 1440,
+                last_scraped_at TEXT,
+                last_status_message TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS priceiq_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device TEXT NOT NULL,
+                storage TEXT,
+                condition_grade TEXT,
+                price REAL NOT NULL,
+                market TEXT DEFAULT 'IN',
+                channel TEXT DEFAULT 'wholesale',
+                source TEXT DEFAULT 'PriceIQ Wholesale Engine',
+                comparables INT DEFAULT 1,
+                synced_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.commit()
+            logger.info("SQLite multi-source and PriceIQ tables verified.")
 
     # =========================================================================
     # Source Management (CRUD & State)
