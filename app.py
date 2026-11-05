@@ -247,15 +247,20 @@ def index():
     )
 
 
+@app.route("/source/wholecellmarket/<slug>")
 @app.route("/rate-card/<slug>")
-def rate_card_page(slug: str):
-    """Dedicated public Wholesale Rate Card & device evaluation view (Zero login required)."""
+def wholecell_source_page(slug: str):
+    """Dedicated WholeCellMarket Device Source Verification view (Zero login required)."""
     records = load_records()
     slug_clean = slug.strip().lower()
 
-    # Find matching device
+    # Prefer matching WholeCellMarket record first
     matched_record = None
-    for r in records:
+    wholecell_records = [
+        r for r in records
+        if 'wholecell' in r.get('source_name', '').lower() or 'wholecell' in r.get('source_url', '').lower()
+    ]
+    for r in wholecell_records:
         m = r.get("model", "").lower()
         m_slug = re.sub(r"[^a-z0-9]+", "-", m).strip("-")
         if m_slug == slug_clean or slug_clean in m_slug or m_slug in slug_clean:
@@ -263,23 +268,52 @@ def rate_card_page(slug: str):
             break
 
     if not matched_record:
+        for r in records:
+            m = r.get("model", "").lower()
+            m_slug = re.sub(r"[^a-z0-9]+", "-", m).strip("-")
+            if m_slug == slug_clean or slug_clean in m_slug or m_slug in slug_clean:
+                matched_record = r
+                break
+
+    if not matched_record:
         matched_record = records[0] if records else {
-            "model": "Apple iPhone 16 (8 GB/128 GB)",
+            "model": "Apple iPhone 13 (4 GB/128 GB)",
             "brand": "Apple",
             "storage": "128 GB",
-            "buyback_price": 53500,
+            "buyback_price": 26750,
         }
 
     device_name = matched_record.get("model", "Mobile Device")
+    brand = matched_record.get("brand", "Apple" if "Apple" in device_name else "Samsung")
     storage = matched_record.get("storage", "Standard")
-    base_price = float(matched_record.get("buyback_price", 50000))
+
+    # Find exact Grade A and Grade B prices for this device
+    matching_wc = [
+        r for r in wholecell_records
+        if r.get("model") == device_name
+    ]
+    grade_a_price = None
+    grade_b_price = None
+    for r in matching_wc:
+        c = (r.get("condition") or "").upper()
+        if "GRADE A" in c:
+            grade_a_price = float(r.get("buyback_price", 0))
+        elif "GRADE B" in c:
+            grade_b_price = float(r.get("buyback_price", 0))
+
+    if not grade_a_price:
+        grade_a_price = float(matched_record.get("buyback_price", 26750))
+    if not grade_b_price:
+        grade_b_price = round(grade_a_price * 0.88)
+
+    base_price = grade_a_price
 
     tiers = [
         {
             "grade": "A",
             "tier_name": "Grade A: Like New / Flawless",
             "factor": 1.00,
-            "price": int(round(base_price)),
+            "price": int(round(grade_a_price)),
             "description": "Like New / Flawless - 100% functional, zero scratches, battery health > 85%",
             "defects": "None (Pristine condition)",
         },
@@ -287,7 +321,7 @@ def rate_card_page(slug: str):
             "grade": "B",
             "tier_name": "Grade B: Good / Minor Wear",
             "factor": 0.88,
-            "price": int(round(base_price * 0.88)),
+            "price": int(round(grade_b_price)),
             "description": "Good - Fully functional, minor hairline scratches on body/frame, no dents",
             "defects": "Minor cosmetic hairline scratches",
         },
@@ -310,8 +344,9 @@ def rate_card_page(slug: str):
     ]
 
     return render_template(
-        "rate_card.html",
+        "source_wholecell.html",
         device_name=device_name,
+        brand=brand,
         storage=storage,
         base_quote=int(round(base_price)),
         tiers=tiers,

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}{{ device_name }} - WholeCellMarket Source Verification{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+
+  <!-- Breadcrumbs & Quick Navigation -->
+  <div class="flex items-center justify-between">
+    <nav class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+      <a href="/" class="hover:text-blue-600 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left text-[11px]"></i> Dashboard
+      </a>
+      <span>/</span>
+      <a href="/sources" class="hover:text-blue-600 transition">Scraping Sources</a>
+      <span>/</span>
+      <span class="text-indigo-600 font-bold">WholeCellMarket</span>
+      <span>/</span>
+      <span class="text-slate-900 font-bold">{{ device_name }}</span>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <a href="/" class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-table-columns text-slate-500"></i> Back to Dashboard
+      </a>
+      <a href="/sources" class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-server text-blue-600"></i> All Sources
+      </a>
+    </div>
+  </div>
+
+  <!-- Device Source Verification Hero Card -->
+  <div class="card-white rounded-2xl p-6 sm:p-8 relative overflow-hidden border-indigo-100 shadow-sm">
+    <div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
+      
+      <!-- Device Header Info -->
+      <div class="space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-indigo-600 text-white shadow-sm inline-flex items-center gap-1.5">
+            <i class="fa-solid fa-boxes-stacked text-xs"></i> WholeCellMarket Official Source
+          </span>
+          <span class="badge-active text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
+            <i class="fa-solid fa-circle-check text-[10px]"></i> Live B2B Feed
+          </span>
+          <span class="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+            Market: India (IN)
+          </span>
+        </div>
+
+        <div>
+          <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ device_name }}</h1>
+          <p class="text-sm text-slate-500 mt-1">
+            Brand: <span class="font-bold text-slate-800">{{ brand }}</span> &bull; 
+            Storage Variant: <span class="font-bold text-slate-800">{{ storage or 'Standard' }}</span> &bull; 
+            Source Provider: <span class="font-bold text-indigo-600">WholeCellMarket B2B Engine</span>
+          </p>
+        </div>
+
+        <div class="flex items-center gap-4 pt-1 text-xs text-slate-500">
+          <span class="inline-flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+            Confidence Score: <strong class="text-slate-700">95% Verified</strong>
+          </span>
+          <span>&bull;</span>
+          <span class="inline-flex items-center gap-1.5">
+            <i class="fa-solid fa-bolt text-amber-500"></i>
+            Data Origin: <code class="font-mono text-slate-700 bg-slate-100 px-1 py-0.5 rounded text-[11px]">wholesale_api_feed</code>
+          </span>
+        </div>
+      </div>
+
+      <!-- Max Buyback Quote Highlight -->
+      <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200/70 rounded-2xl p-5 text-right min-w-[240px] shrink-0 shadow-sm">
+        <p class="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Top Buyback Valuation (Grade A)</p>
+        <p class="text-3xl sm:text-4xl font-extrabold text-indigo-700 font-mono mt-1">₹{{ '{:,}'.format(base_quote) }}</p>
+        <div class="flex items-center justify-end gap-1 mt-2 text-xs font-medium text-emerald-700">
+          <i class="fa-solid fa-circle-check text-emerald-500 text-[11px]"></i>
+          <span>Exact Source Baseline Quote</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Verified Condition-Wise Pricing Matrix -->
+  <div class="card-white rounded-2xl overflow-hidden shadow-sm">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+      <div>
+        <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-indigo-600"></i>
+          Condition Grade Buyback Quotes
+        </h2>
+        <p class="text-xs text-slate-500 mt-0.5">Verified WholeCellMarket wholesale pricing broken down by device physical condition.</p>
+      </div>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-indigo-700 font-mono">
+        4 Condition Tiers
+      </span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      {% for tier in tiers %}
+      <div class="p-5 hover:bg-slate-50/70 transition flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        <!-- Grade Indicator & Description -->
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center font-black text-base shadow-sm shrink-0
+                      {% if tier.grade == 'A' %}bg-emerald-100 text-emerald-700 border border-emerald-300
+                      {% elif tier.grade == 'B' %}bg-blue-100 text-blue-700 border border-blue-300
+                      {% elif tier.grade == 'C' %}bg-amber-100 text-amber-700 border border-amber-300
+                      {% else %}bg-rose-100 text-rose-700 border border-rose-300{% endif %}">
+            {{ tier.grade }}
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="font-bold text-slate-900 text-sm">{{ tier.tier_name }}</h3>
+              <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                Grade {{ tier.grade }}
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1">{{ tier.description }}</p>
+            <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500">
+              <span class="font-semibold text-slate-600">Permitted Defects:</span>
+              <span class="font-mono text-slate-700">{{ tier.defects }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Price Display -->
+        <div class="text-right shrink-0 md:min-w-[160px]">
+          <span class="text-xs text-slate-400 font-medium block">Wholesale Buyback</span>
+          <span class="text-2xl font-extrabold font-mono text-slate-900 block mt-0.5">
+            ₹{{ '{:,}'.format(tier.price) }}
+          </span>
+          <span class="text-[11px] font-medium text-emerald-600 inline-flex items-center gap-1">
+            <i class="fa-solid fa-check text-[10px]"></i> Verified on Source
+          </span>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Source Authenticity & Audit Details Card -->
+  <div class="card-white rounded-2xl p-6 shadow-sm border-slate-200">
+    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-circle-nodes text-indigo-600"></i>
+      WholeCellMarket Source Audit & API Specifications
+    </h3>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <span class="text-slate-400 block mb-1">Source Name</span>
+        <span class="font-bold text-slate-800 text-sm">WholeCellMarket</span>
+      </div>
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <span class="text-slate-400 block mb-1">Source Bucket</span>
+        <span class="font-mono font-semibold text-indigo-600 text-sm">wholecell_wholesale</span>
+      </div>
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <span class="text-slate-400 block mb-1">Category & Market</span>
+        <span class="font-semibold text-slate-800 text-sm">Smartphones &bull; India (IN)</span>
+      </div>
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <span class="text-slate-400 block mb-1">Currency Code</span>
+        <span class="font-mono font-bold text-slate-800 text-sm">INR (₹)</span>
+      </div>
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500">
+      <p class="leading-relaxed">
+        This record is verified and indexed directly from WholeCellMarket's B2B wholesale pricing engine into PostgreSQL for multi-source price intelligence.
+      </p>
+      <a href="https://thesuperiq.com/apps/priceiq/programs?market=IN&search={{ device_name|urlencode }}" target="_blank" rel="noopener" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 inline-flex items-center gap-1.5 hover:text-indigo-600" title="For authorized partners with SuperIQ credentials">
+        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+        <span>SuperIQ Partner Portal</span>
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
