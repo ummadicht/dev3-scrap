@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import urllib.parse
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -53,16 +55,27 @@ class DatabaseManager:
         self.database_url = db_url
         if db_url:
             import urllib.parse
-            parsed = urllib.parse.urlparse(db_url)
-            db_dialect = (parsed.scheme.split("+")[0] or "postgresql").lower()
-            db_user = urllib.parse.unquote(parsed.username or "")
-            db_password = urllib.parse.unquote(parsed.password or "")
-            db_host = parsed.hostname or "127.0.0.1"
-            default_p = 5432 if "postgres" in db_dialect else 3306
-            db_remote_port = parsed.port or default_p
-            parsed_path = parsed.path.lstrip("/")
-            if parsed_path:
-                db_name = parsed_path
+            # Safe parsing regex for passwords containing unencoded '@' characters
+            url_match = re.match(r'^(?P<scheme>[^:]+)://(?:(?P<user>[^:]+)(?::(?P<password>.+))?@)?(?P<host>[^:/@]+)(?::(?P<port>\d+))?(?:/(?P<dbname>[^?]+))?', db_url)
+            if url_match:
+                db_dialect = (url_match.group("scheme") or "postgresql").lower().split("+")[0]
+                db_user = urllib.parse.unquote(url_match.group("user") or "")
+                db_password = urllib.parse.unquote(url_match.group("password") or "")
+                db_host = url_match.group("host") or "127.0.0.1"
+                default_p = 5432 if "postgres" in db_dialect else 3306
+                db_remote_port = int(url_match.group("port") or default_p)
+                db_name = (url_match.group("dbname") or "scrapingdb").strip("/")
+            else:
+                parsed = urllib.parse.urlparse(db_url)
+                db_dialect = (parsed.scheme.split("+")[0] or "postgresql").lower()
+                db_user = urllib.parse.unquote(parsed.username or "")
+                db_password = urllib.parse.unquote(parsed.password or "")
+                db_host = parsed.hostname or "127.0.0.1"
+                default_p = 5432 if "postgres" in db_dialect else 3306
+                db_remote_port = parsed.port or default_p
+                parsed_path = parsed.path.lstrip("/")
+                if parsed_path:
+                    db_name = parsed_path
 
         self.ssh_host = ssh_host if ssh_host is not None else os.getenv("SSH_HOST", "")
         self.ssh_port = int(ssh_port if ssh_port is not None else os.getenv("SSH_PORT", "22"))
@@ -140,16 +153,23 @@ class DatabaseManager:
         try:
             if self.db_dialect == "postgresql":
                 import psycopg2
-                if self.database_url and not use_tunnel:
-                    conn = psycopg2.connect(self.database_url)
-                else:
+                try:
                     conn = psycopg2.connect(
                         host=target_host,
                         port=target_port,
                         dbname=self.db_name,
                         user=self.db_user,
                         password=self.db_password,
+                        connect_timeout=10,
                     )
+                except Exception as direct_err:
+                    if self.database_url and not use_tunnel:
+                        try:
+                            conn = psycopg2.connect(self.database_url, connect_timeout=10)
+                        except Exception:
+                            raise direct_err
+                    else:
+                        raise direct_err
             elif self.db_dialect in ("sqlite", "sqlite3"):
                 import sqlite3
                 sqlite_path = self.database_url.replace("sqlite:///", "").replace("sqlite://", "") if self.database_url else self.db_name

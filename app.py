@@ -982,7 +982,23 @@ def save_to_csv_raw(records: List[Dict[str, Any]], path: Path):
 @app.route("/refurbished")
 def refurbished_catalog():
     """Renders Refurbished Mobile Selling Prices page with prominent REFURBISHED mark."""
-    records = db_manager.get_sell_prices(limit=500)
+    records = []
+    try:
+        records = db_manager.get_sell_prices(limit=500)
+    except Exception as e:
+        logger.warning("Could not fetch sell prices from DB: %s", e)
+
+    # Fallback to local report cache if DB returned empty or was unreachable
+    if not records:
+        report_file = Path("cashify_sell_refurbished_prices_report.csv")
+        if report_file.exists():
+            try:
+                import pandas as pd
+                df = pd.read_csv(report_file)
+                records = df.to_dict(orient="records")
+            except Exception as e:
+                logger.warning("Could not load fallback CSV: %s", e)
+
     return render_template("refurbished.html", records=records)
 
 
@@ -990,9 +1006,15 @@ def refurbished_catalog():
 def export_buy_endpoint(format_type: str):
     """Generates and downloads independent Cashify Buy Mobile Prices Report."""
     format_clean = format_type.lower()
-    records = db_manager.get_buy_prices(limit=1000)
+    records = []
+    try:
+        records = db_manager.get_buy_prices(limit=1000)
+    except Exception as e:
+        logger.warning("Could not fetch buy prices from DB: %s", e)
+
     if not records:
         records = load_records()
+
     ext = "xlsx" if format_clean in ("excel", "xlsx") else ("json" if format_clean == "json" else "csv")
     out_file = Path(f"cashify_buy_prices_report.{ext}")
     export_buy_report(records, out_file, format=format_clean)
@@ -1004,7 +1026,22 @@ def export_buy_endpoint(format_type: str):
 def export_sell_endpoint(format_type: str):
     """Generates and downloads independent Cashify Refurbished Sell Mobile Prices Report."""
     format_clean = format_type.lower()
-    records = db_manager.get_sell_prices(limit=1000)
+    records = []
+    try:
+        records = db_manager.get_sell_prices(limit=1000)
+    except Exception as e:
+        logger.warning("Could not fetch sell prices from DB: %s", e)
+
+    if not records:
+        report_file = Path("cashify_sell_refurbished_prices_report.csv")
+        if report_file.exists():
+            try:
+                import pandas as pd
+                df = pd.read_csv(report_file)
+                records = df.to_dict(orient="records")
+            except Exception:
+                pass
+
     ext = "xlsx" if format_clean in ("excel", "xlsx") else ("json" if format_clean == "json" else "csv")
     out_file = Path(f"cashify_sell_refurbished_prices_report.{ext}")
     export_sell_report(records, out_file, format=format_clean)
