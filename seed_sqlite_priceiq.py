@@ -152,3 +152,4 @@ def seed_sqlite_db(db_path: Path = DB_PATH) -> int:
 
 if __name__ == "__main__":
     seed_sqlite_db()
+

@@ -117,6 +117,53 @@ class PriceIQClient:
         logger.info("Formatted %d rows for PriceIQ sync.", len(rows))
         return rows
 
+    @staticmethod
+    def sync_to_postgres_priceiq_schema(db_manager, records: List[Dict[str, Any]]) -> Dict[str, int]:
+        """
+        Directly sync PriceIQ wholesale pricing records and rate cards
+        into PostgreSQL 'price_iq' schema tables:
+        - price_iq.pricing_records
+        - price_iq.rate_card_matrix
+        """
+        with db_manager.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("CREATE SCHEMA IF NOT EXISTS price_iq;")
+                cur.execute("SET search_path TO price_iq, public;")
+
+                insert_pricing_sql = """
+                INSERT INTO price_iq.pricing_records (
+                    brand, device_model, storage, ram, condition_grade,
+                    wholesale_price, currency, market, channel, source_provider,
+                    source_url, confidence_score, comparables, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (device_model, storage, condition_grade, channel) DO UPDATE SET
+                    wholesale_price = EXCLUDED.wholesale_price,
+                    confidence_score = EXCLUDED.confidence_score,
+                    updated_at = CURRENT_TIMESTAMP;
+                """
+
+                count = 0
+                for r in records:
+                    cur.execute(insert_pricing_sql, (
+                        r.get("brand", "Generic"),
+                        r.get("model", ""),
+                        r.get("storage", ""),
+                        r.get("ram", ""),
+                        r.get("condition", "Grade A"),
+                        float(r.get("buyback_price", 0)),
+                        r.get("currency", "INR"),
+                        "IN",
+                        "wholesale",
+                        "WholeCellMarket",
+                        r.get("source_url", ""),
+                        float(r.get("confidence_score", 0.95)),
+                        1
+                    ))
+                    count += 1
+                conn.commit()
+                logger.info("Synced %d records into PostgreSQL price_iq schema.", count)
+                return {"synced_count": count}
+
     def sync_bulk_prices(
         self,
         rows: List[Dict[str, Any]],

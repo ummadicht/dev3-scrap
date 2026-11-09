@@ -184,24 +184,9 @@ class DatabaseManager:
 
         if self.db_dialect == "postgresql":
             with conn.cursor() as cur:
-                cur.execute(f"SET search_path TO {schema}, public;")
-                # Fast existence check: If scraping_sources already exists, skip DDL to avoid ownership issues
-                try:
-                    cur.execute("""
-                        SELECT 1 FROM information_schema.tables 
-                        WHERE table_name = 'scraping_sources' 
-                        AND (table_schema = %s OR table_schema = 'public')
-                        LIMIT 1;
-                    """, (schema,))
-                    if cur.fetchone() is not None:
-                        return
-                except Exception:
-                    pass
-
                 if schema and schema != "public":
                     try:
                         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema};")
-                        cur.execute(f"GRANT ALL ON SCHEMA {schema} TO PUBLIC;")
                     except Exception:
                         pass
                 cur.execute(f"SET search_path TO {schema}, public;")
@@ -227,6 +212,67 @@ class DatabaseManager:
                     CONSTRAINT uq_device_variant_condition UNIQUE (source_url, storage, condition)
                 );
                 CREATE INDEX IF NOT EXISTS idx_brand_model ON mobile_buyback_pricing (brand, model);
+                """)
+
+                # 1b. Separate Cashify Buy Prices Table
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS cashify_buy_prices (
+                    id SERIAL PRIMARY KEY,
+                    brand VARCHAR(50) NOT NULL,
+                    model VARCHAR(200) NOT NULL,
+                    model_series VARCHAR(100),
+                    variant VARCHAR(100),
+                    storage VARCHAR(50),
+                    ram VARCHAR(50),
+                    cores VARCHAR(50),
+                    camera VARCHAR(100),
+                    color VARCHAR(50),
+                    network_type VARCHAR(20),
+                    condition VARCHAR(255) NOT NULL,
+                    defects TEXT,
+                    buyback_price NUMERIC(10, 2) NOT NULL,
+                    max_advertised_price NUMERIC(10, 2),
+                    condition_deductions NUMERIC(10, 2),
+                    currency VARCHAR(10) DEFAULT 'INR',
+                    data_origin VARCHAR(50) DEFAULT 'verified_scraped',
+                    confidence_score NUMERIC(3, 2) DEFAULT 1.0,
+                    source_url TEXT NOT NULL,
+                    scraped_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_buy_device_variant_condition UNIQUE (source_url, storage, condition)
+                );
+                CREATE INDEX IF NOT EXISTS idx_buy_brand_model ON cashify_buy_prices (brand, model);
+                """)
+
+                # 1c. Separate Cashify Sell Prices Table (Refurbished Mobiles)
+                cur.execute("""
+                CREATE TABLE IF NOT EXISTS cashify_sell_prices (
+                    id SERIAL PRIMARY KEY,
+                    brand VARCHAR(50) NOT NULL,
+                    model VARCHAR(200) NOT NULL,
+                    model_series VARCHAR(100),
+                    variant VARCHAR(100),
+                    storage VARCHAR(50),
+                    ram VARCHAR(50),
+                    color VARCHAR(50),
+                    network_type VARCHAR(20),
+                    is_refurbished BOOLEAN DEFAULT TRUE NOT NULL,
+                    refurbished_mark VARCHAR(50) DEFAULT 'REFURBISHED' NOT NULL,
+                    refurbished_grade VARCHAR(50) NOT NULL,
+                    device_condition VARCHAR(150) NOT NULL,
+                    selling_price NUMERIC(10, 2) NOT NULL,
+                    original_mrp NUMERIC(10, 2),
+                    discount_percent NUMERIC(5, 2),
+                    warranty VARCHAR(200) DEFAULT '6 Months Warranty, 15 Days Refund',
+                    availability VARCHAR(50) DEFAULT 'InStock',
+                    sku VARCHAR(100),
+                    currency VARCHAR(10) DEFAULT 'INR',
+                    source_url TEXT NOT NULL,
+                    scraped_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_sell_sku_grade UNIQUE (source_url, sku, refurbished_grade)
+                );
+                CREATE INDEX IF NOT EXISTS idx_sell_brand_model ON cashify_sell_prices (brand, model);
+                CREATE INDEX IF NOT EXISTS idx_sell_is_refurbished ON cashify_sell_prices (is_refurbished);
+                CREATE INDEX IF NOT EXISTS idx_sell_grade ON cashify_sell_prices (refurbished_grade);
                 """)
 
                 # 2. Centralized Scraping Sources Management Table
@@ -339,6 +385,55 @@ class DatabaseManager:
                 source_url TEXT NOT NULL,
                 scraped_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (source_url, storage, condition)
+            );
+            CREATE TABLE IF NOT EXISTS cashify_buy_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand TEXT NOT NULL,
+                model TEXT NOT NULL,
+                model_series TEXT,
+                variant TEXT,
+                storage TEXT,
+                ram TEXT,
+                cores TEXT,
+                camera TEXT,
+                color TEXT,
+                network_type TEXT,
+                condition TEXT NOT NULL,
+                defects TEXT,
+                buyback_price REAL NOT NULL,
+                max_advertised_price REAL,
+                condition_deductions REAL,
+                currency TEXT DEFAULT 'INR',
+                data_origin TEXT DEFAULT 'verified_scraped',
+                confidence_score REAL DEFAULT 1.0,
+                source_url TEXT NOT NULL,
+                scraped_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (source_url, storage, condition)
+            );
+            CREATE TABLE IF NOT EXISTS cashify_sell_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand TEXT NOT NULL,
+                model TEXT NOT NULL,
+                model_series TEXT,
+                variant TEXT,
+                storage TEXT,
+                ram TEXT,
+                color TEXT,
+                network_type TEXT,
+                is_refurbished INTEGER DEFAULT 1 NOT NULL,
+                refurbished_mark TEXT DEFAULT 'REFURBISHED' NOT NULL,
+                refurbished_grade TEXT NOT NULL,
+                device_condition TEXT NOT NULL,
+                selling_price REAL NOT NULL,
+                original_mrp REAL,
+                discount_percent REAL,
+                warranty TEXT DEFAULT '6 Months Warranty, 15 Days Refund',
+                availability TEXT DEFAULT 'InStock',
+                sku TEXT,
+                currency TEXT DEFAULT 'INR',
+                source_url TEXT NOT NULL,
+                scraped_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (source_url, sku, refurbished_grade)
             );
             """)
             cur.execute("""
@@ -1097,7 +1192,279 @@ class DatabaseManager:
 
             conn.commit()
             logger.info("Successfully upserted %d records to central DB mirror table.", inserted_or_updated)
+
+            # Also sync into cashify_buy_prices table
+            try:
+                with conn.cursor() as cur:
+                    for rec in records:
+                        if self.db_dialect == "postgresql":
+                            cur.execute("""
+                                INSERT INTO cashify_buy_prices (
+                                    brand, model, storage, ram, cores, camera,
+                                    condition, defects, buyback_price, currency,
+                                    data_origin, confidence_score, source_url, scraped_at
+                                ) VALUES (
+                                    %(brand)s, %(model)s, %(storage)s, %(ram)s, %(cores)s, %(camera)s,
+                                    %(condition)s, %(defects)s, %(buyback_price)s, %(currency)s,
+                                    %(data_origin)s, %(confidence_score)s, %(source_url)s, %(timestamp)s
+                                )
+                                ON CONFLICT (source_url, storage, condition) DO UPDATE SET
+                                    buyback_price = EXCLUDED.buyback_price,
+                                    scraped_at = EXCLUDED.scraped_at;
+                            """, {
+                                "brand": rec.get("brand", "Unknown"),
+                                "model": rec.get("model", "Unknown"),
+                                "storage": rec.get("storage", ""),
+                                "ram": rec.get("ram", ""),
+                                "cores": rec.get("cores", ""),
+                                "camera": rec.get("camera", ""),
+                                "condition": rec.get("condition", "Grade A"),
+                                "defects": rec.get("defects", "None"),
+                                "buyback_price": rec.get("buyback_price", 0),
+                                "currency": rec.get("currency", "INR"),
+                                "data_origin": rec.get("data_origin", "verified_scraped"),
+                                "confidence_score": rec.get("confidence_score", 1.0),
+                                "source_url": rec.get("source_url", ""),
+                                "timestamp": rec.get("timestamp"),
+                            })
+                        else:
+                            cur.execute("""
+                                INSERT INTO cashify_buy_prices (
+                                    brand, model, storage, ram, cores, camera,
+                                    condition, defects, buyback_price, currency,
+                                    data_origin, confidence_score, source_url, scraped_at
+                                ) VALUES (
+                                    :brand, :model, :storage, :ram, :cores, :camera,
+                                    :condition, :defects, :buyback_price, :currency,
+                                    :data_origin, :confidence_score, :source_url, :timestamp
+                                )
+                                ON CONFLICT (source_url, storage, condition) DO UPDATE SET
+                                    buyback_price = excluded.buyback_price,
+                                    scraped_at = excluded.scraped_at;
+                            """, {
+                                "brand": rec.get("brand", "Unknown"),
+                                "model": rec.get("model", "Unknown"),
+                                "storage": rec.get("storage", ""),
+                                "ram": rec.get("ram", ""),
+                                "cores": rec.get("cores", ""),
+                                "camera": rec.get("camera", ""),
+                                "condition": rec.get("condition", "Grade A"),
+                                "defects": rec.get("defects", "None"),
+                                "buyback_price": rec.get("buyback_price", 0),
+                                "currency": rec.get("currency", "INR"),
+                                "data_origin": rec.get("data_origin", "verified_scraped"),
+                                "confidence_score": rec.get("confidence_score", 1.0),
+                                "source_url": rec.get("source_url", ""),
+                                "timestamp": rec.get("timestamp"),
+                            })
+                    conn.commit()
+            except Exception as e:
+                logger.warning("Could not sync into cashify_buy_prices: %s", e)
+
             return inserted_or_updated
+
+    # =========================================================================
+    # Refurbished Sell Prices Operations (Dedicated Sell Table)
+    # =========================================================================
+
+    def upsert_sell_records(self, records: List[Dict[str, Any]]) -> int:
+        """Upsert refurbished records into the dedicated cashify_sell_prices table."""
+        if not records:
+            logger.warning("No refurbished sell records supplied for DB upsert.")
+            return 0
+
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            inserted_or_updated = 0
+
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                is_pg = (self.db_dialect == "postgresql")
+
+                for rec in records:
+                    sku = rec.get("sku") or f"{rec.get('model')}-{rec.get('storage')}-{rec.get('color')}"
+                    params = {
+                        "brand": rec.get("brand", "Unknown"),
+                        "model": rec.get("model", "Unknown"),
+                        "model_series": rec.get("model_series", ""),
+                        "variant": rec.get("variant", ""),
+                        "storage": rec.get("storage", ""),
+                        "ram": rec.get("ram", ""),
+                        "color": rec.get("color", ""),
+                        "network_type": rec.get("network_type", ""),
+                        "is_refurbished": True,
+                        "refurbished_mark": rec.get("refurbished_mark", "REFURBISHED"),
+                        "refurbished_grade": rec.get("refurbished_grade", "Superb"),
+                        "device_condition": rec.get("device_condition", "Refurbished - Superb"),
+                        "selling_price": rec.get("selling_price", 0),
+                        "original_mrp": rec.get("original_mrp"),
+                        "discount_percent": rec.get("discount_percent"),
+                        "warranty": rec.get("warranty", "6 Months Warranty, 15 Days Refund"),
+                        "availability": rec.get("availability", "InStock"),
+                        "sku": sku,
+                        "currency": rec.get("currency", "INR"),
+                        "source_url": rec.get("source_url", ""),
+                        "timestamp": rec.get("timestamp") or datetime.utcnow().isoformat(),
+                    }
+
+                    try:
+                        if is_pg:
+                            cur.execute("""
+                                INSERT INTO cashify_sell_prices (
+                                    brand, model, model_series, variant, storage, ram, color, network_type,
+                                    is_refurbished, refurbished_mark, refurbished_grade, device_condition,
+                                    selling_price, original_mrp, discount_percent, warranty, availability,
+                                    sku, currency, source_url, scraped_at
+                                ) VALUES (
+                                    %(brand)s, %(model)s, %(model_series)s, %(variant)s, %(storage)s, %(ram)s, %(color)s, %(network_type)s,
+                                    %(is_refurbished)s, %(refurbished_mark)s, %(refurbished_grade)s, %(device_condition)s,
+                                    %(selling_price)s, %(original_mrp)s, %(discount_percent)s, %(warranty)s, %(availability)s,
+                                    %(sku)s, %(currency)s, %(source_url)s, %(timestamp)s
+                                )
+                                ON CONFLICT (source_url, sku, refurbished_grade) DO UPDATE SET
+                                    selling_price = EXCLUDED.selling_price,
+                                    original_mrp = EXCLUDED.original_mrp,
+                                    discount_percent = EXCLUDED.discount_percent,
+                                    warranty = EXCLUDED.warranty,
+                                    availability = EXCLUDED.availability,
+                                    is_refurbished = EXCLUDED.is_refurbished,
+                                    refurbished_mark = EXCLUDED.refurbished_mark,
+                                    device_condition = EXCLUDED.device_condition,
+                                    scraped_at = EXCLUDED.scraped_at;
+                            """, params)
+                        else:
+                            cur.execute("""
+                                INSERT INTO cashify_sell_prices (
+                                    brand, model, model_series, variant, storage, ram, color, network_type,
+                                    is_refurbished, refurbished_mark, refurbished_grade, device_condition,
+                                    selling_price, original_mrp, discount_percent, warranty, availability,
+                                    sku, currency, source_url, scraped_at
+                                ) VALUES (
+                                    :brand, :model, :model_series, :variant, :storage, :ram, :color, :network_type,
+                                    :is_refurbished, :refurbished_mark, :refurbished_grade, :device_condition,
+                                    :selling_price, :original_mrp, :discount_percent, :warranty, :availability,
+                                    :sku, :currency, :source_url, :timestamp
+                                )
+                                ON CONFLICT (source_url, sku, refurbished_grade) DO UPDATE SET
+                                    selling_price = excluded.selling_price,
+                                    original_mrp = excluded.original_mrp,
+                                    discount_percent = excluded.discount_percent,
+                                    warranty = excluded.warranty,
+                                    availability = excluded.availability,
+                                    scraped_at = excluded.scraped_at;
+                            """, params)
+                        inserted_or_updated += 1
+                    except Exception as e:
+                        logger.error("Error upserting sell record %s: %s", params.get("model"), e)
+                        if is_pg:
+                            conn.rollback()
+
+                conn.commit()
+            logger.info("Successfully upserted %d refurbished sell records into cashify_sell_prices.", inserted_or_updated)
+            return inserted_or_updated
+
+    def get_buy_prices(self, limit: int = 500, brand: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch records from cashify_buy_prices (or fallback to mobile_buyback_pricing)."""
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                # Try cashify_buy_prices first, fallback to mobile_buyback_pricing if empty
+                target_table = "cashify_buy_prices"
+                cur.execute(f"SELECT COUNT(*) FROM {target_table};")
+                count = cur.fetchone()[0]
+                if count == 0:
+                    target_table = "mobile_buyback_pricing"
+
+                is_pg = (self.db_dialect == "postgresql")
+                placeholder = "%s" if is_pg else "?"
+
+                if brand:
+                    query = f"SELECT * FROM {target_table} WHERE brand ILIKE {placeholder} ORDER BY brand, model, storage LIMIT {placeholder};" if is_pg else f"SELECT * FROM {target_table} WHERE LOWER(brand) = LOWER({placeholder}) ORDER BY brand, model, storage LIMIT {placeholder};"
+                    cur.execute(query, (brand, limit))
+                else:
+                    query = f"SELECT * FROM {target_table} ORDER BY brand, model, storage LIMIT {placeholder};"
+                    cur.execute(query, (limit,))
+
+                cols = [desc[0] for desc in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    def get_sell_prices(self, limit: int = 500, brand: Optional[str] = None, grade: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch records from the dedicated refurbished cashify_sell_prices table."""
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                is_pg = (self.db_dialect == "postgresql")
+                placeholder = "%s" if is_pg else "?"
+
+                conditions = ["1=1"]
+                params = []
+
+                if brand:
+                    conditions.append(f"brand ILIKE {placeholder}" if is_pg else f"LOWER(brand) = LOWER({placeholder})")
+                    params.append(brand)
+                if grade:
+                    conditions.append(f"refurbished_grade ILIKE {placeholder}" if is_pg else f"LOWER(refurbished_grade) = LOWER({placeholder})")
+                    params.append(grade)
+
+                params.append(limit)
+                query = f"SELECT * FROM cashify_sell_prices WHERE {' AND '.join(conditions)} ORDER BY brand, model, selling_price ASC LIMIT {placeholder};"
+                cur.execute(query, tuple(params))
+                cols = [desc[0] for desc in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    def get_price_intelligence_comparison(self, brand: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Compare Buy prices vs Refurbished Sell prices to determine Cashify's Gross Profit Margin.
+        Margin = Refurbished Sell Price - Buyback Purchase Price
+        """
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                # Match by brand and model
+                query = """
+                SELECT 
+                    s.brand,
+                    s.model,
+                    s.storage,
+                    s.refurbished_grade,
+                    s.is_refurbished,
+                    s.refurbished_mark,
+                    b.buyback_price AS cashify_buy_price,
+                    s.selling_price AS cashify_sell_price,
+                    s.original_mrp,
+                    (s.selling_price - b.buyback_price) AS gross_margin,
+                    ROUND(((s.selling_price - b.buyback_price) / NULLIF(b.buyback_price, 0)) * 100, 1) AS margin_percentage,
+                    s.warranty,
+                    s.source_url AS sell_url,
+                    b.source_url AS buy_url
+                FROM cashify_sell_prices s
+                JOIN mobile_buyback_pricing b 
+                  ON LOWER(s.brand) = LOWER(b.brand) 
+                 AND LOWER(s.model) = LOWER(b.model)
+                ORDER BY gross_margin DESC;
+                """
+                try:
+                    cur.execute(query)
+                    cols = [desc[0] for desc in cur.description]
+                    return [dict(zip(cols, r)) for r in cur.fetchall()]
+                except Exception as e:
+                    logger.warning("Could not execute margin comparison query: %s", e)
+                    return []
 
 
 if __name__ == "__main__":

@@ -86,3 +86,9 @@ ehthumbs.db
 # Logs
 *.log
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+

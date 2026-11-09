@@ -40,10 +40,11 @@ from config import (
 )
 from db import DatabaseManager
 from driver_manager import driver_manager
-from exporter import save_to_json
+from exporter import save_to_json, export_buy_report, export_sell_report, export_margin_report
 from grading_engine import GradingEngine
-from models import MobilePriceRecord
+from models import MobilePriceRecord, CashifySellPriceRecord
 from scraper import CashifyScraper
+from sell_scraper import CashifySellScraper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -975,6 +976,56 @@ def save_to_csv_raw(records: List[Dict[str, Any]], path: Path):
     logger.info("Exported %d records to %s", len(records), path)
 
 
+# ---------------------------------------------------------------------------
+# Refurbished Sell Catalog & Dedicated Reports
+# ---------------------------------------------------------------------------
+@app.route("/refurbished")
+def refurbished_catalog():
+    """Renders Refurbished Mobile Selling Prices page with prominent REFURBISHED mark."""
+    records = db_manager.get_sell_prices(limit=500)
+    return render_template("refurbished.html", records=records)
+
+
+@app.route("/api/export/buy/<format_type>")
+def export_buy_endpoint(format_type: str):
+    """Generates and downloads independent Cashify Buy Mobile Prices Report."""
+    format_clean = format_type.lower()
+    records = db_manager.get_buy_prices(limit=1000)
+    if not records:
+        records = load_records()
+    ext = "xlsx" if format_clean in ("excel", "xlsx") else ("json" if format_clean == "json" else "csv")
+    out_file = Path(f"cashify_buy_prices_report.{ext}")
+    export_buy_report(records, out_file, format=format_clean)
+    mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if ext == "xlsx" else ("application/json" if ext == "json" else "text/csv")
+    return send_file(out_file, mimetype=mime, as_attachment=True, download_name=out_file.name)
+
+
+@app.route("/api/export/sell/<format_type>")
+def export_sell_endpoint(format_type: str):
+    """Generates and downloads independent Cashify Refurbished Sell Mobile Prices Report."""
+    format_clean = format_type.lower()
+    records = db_manager.get_sell_prices(limit=1000)
+    ext = "xlsx" if format_clean in ("excel", "xlsx") else ("json" if format_clean == "json" else "csv")
+    out_file = Path(f"cashify_sell_refurbished_prices_report.{ext}")
+    export_sell_report(records, out_file, format=format_clean)
+    mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if ext == "xlsx" else ("application/json" if ext == "json" else "text/csv")
+    return send_file(out_file, mimetype=mime, as_attachment=True, download_name=out_file.name)
+
+
+@app.route("/api/scrape/refurbished", methods=["POST"])
+def api_scrape_refurbished():
+    """Trigger independent scraper for Cashify Refurbished mobiles."""
+    scraper = CashifySellScraper(db_manager=db_manager)
+    apple_recs = scraper.scrape_and_save_brand("apple", max_devices=3, save_db=True)
+    samsung_recs = scraper.scrape_and_save_brand("samsung", max_devices=3, save_db=True)
+    total = len(apple_recs) + len(samsung_recs)
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully scraped {total} refurbished quotes (Apple: {len(apple_recs)}, Samsung: {len(samsung_recs)})",
+        "records_count": total
+    })
+
+
 @app.route("/api/migrate/sqlite-to-postgres", methods=["POST"])
 def api_migrate_sqlite_to_postgres():
     """Trigger PriceIQ SQLite to PostgreSQL migration with percentage progress report."""
@@ -993,6 +1044,41 @@ def api_migrate_sqlite_to_postgres():
             "progress_pct": 0,
             "error": str(exc),
         }), 500
+
+
+@app.route("/api/priceiq/prices", methods=["GET"])
+def api_get_priceiq_prices():
+    """Retrieve PriceIQ wholesale pricing records directly from PostgreSQL 'price_iq' schema."""
+    brand = request.args.get("brand")
+    limit = request.args.get("limit", 100, type=int)
+    try:
+        records = db_manager.get_priceiq_pricing_records(limit=limit, brand=brand)
+        return jsonify({
+            "success": True,
+            "schema": "price_iq",
+            "count": len(records),
+            "records": records,
+        })
+    except Exception as exc:
+        logger.exception("Error fetching price_iq.pricing_records: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@app.route("/api/priceiq/rate-cards", methods=["GET"])
+def api_get_priceiq_rate_cards():
+    """Retrieve PriceIQ 4-tier condition rate cards directly from PostgreSQL 'price_iq' schema."""
+    limit = request.args.get("limit", 100, type=int)
+    try:
+        cards = db_manager.get_priceiq_rate_cards(limit=limit)
+        return jsonify({
+            "success": True,
+            "schema": "price_iq",
+            "count": len(cards),
+            "rate_cards": cards,
+        })
+    except Exception as exc:
+        logger.exception("Error fetching price_iq.rate_card_matrix: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 if __name__ == "__main__":
