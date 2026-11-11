@@ -116,6 +116,23 @@ def run_pipeline(include_matrix: bool = True) -> int:
     save_to_json(final_records, OUTPUT_JSON_PATH)
     save_to_csv(final_records, OUTPUT_CSV_PATH)
 
+    # Sync to Database
+    try:
+        from datetime import datetime, timezone
+        from db import DatabaseManager
+        db = DatabaseManager()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        records_dict = [
+            r.model_dump() if hasattr(r, "model_dump") else (r.dict() if hasattr(r, "dict") else dict(r))
+            for r in final_records
+        ]
+        for r in records_dict:
+            r["timestamp"] = now_iso
+        db.upsert_records(records_dict)
+        logger.info("Successfully synced %d records to PostgreSQL (cashify_buy_prices).", len(records_dict))
+    except Exception as db_err:
+        logger.warning("Could not sync to database: %s", db_err)
+
     # CLI Output
     print_summary_table(final_records)
     print_price_intelligence_insights(final_records)
