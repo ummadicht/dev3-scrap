@@ -1,0 +1,240 @@
+name: Actions Pipeline Status Notifications
+
+on:
+  workflow_run:
+    workflows:
+      - "PR CI"
+      - "SwapUp Deploy (develop)"
+      - "Rollback Service"
+    types:
+      - completed
+
+permissions:
+  actions: read
+
+jobs:
+  notify:
+    name: Notify Slack on Pipeline Completion
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Get Pipeline Job Details and Send Slack Notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_ACTIONS_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+
+          STATUS: ${{ github.event.workflow_run.status }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+
+          EVENT: ${{ github.event.workflow_run.event }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          CREATED_AT: ${{ github.event.workflow_run.created_at }}
+          UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+
+        run: |
+          set -euo pipefail
+
+          echo "Fetching workflow job details..."
+
+          # Retrieve all jobs belonging to the completed workflow run
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
+            -o jobs.json
+
+          # Identify unsuccessful jobs
+          FAILED_JOBS="$(jq -r '
+            [
+              .jobs[]
+              | select(
+                  .conclusion == "failure" or
+                  .conclusion == "timed_out" or
+                  .conclusion == "cancelled"
+                )
+              | "\(.name) — \(.conclusion)"
+            ]
+            | if length == 0 then "None"
+              else join("\n")
+              end
+          ' jobs.json)"
+
+          # Identify failed or timed-out steps
+          FAILED_STEPS="$(jq -r '
+            [
+              .jobs[] as $job
+              | $job.steps[]?
+              | select(
+                  .conclusion == "failure" or
+                  .conclusion == "timed_out"
+                )
+              | "\($job.name) → \(.name) (\(.conclusion))"
+            ]
+            | if length == 0 then "None"
+              else join("\n")
+              end
+          ' jobs.json)"
+
+          # Set status emoji
+          case "$CONCLUSION" in
+            success)
+              STATUS_EMOJI=":white_check_mark:"
+              STATUS_TEXT="SUCCESS"
+              ;;
+            failure)
+              STATUS_EMOJI=":x:"
+              STATUS_TEXT="FAILED"
+              ;;
+            cancelled)
+              STATUS_EMOJI=":no_entry_sign:"
+              STATUS_TEXT="CANCELLED"
+              ;;
+            timed_out)
+              STATUS_EMOJI=":alarm_clock:"
+              STATUS_TEXT="TIMED OUT"
+              ;;
+            skipped)
+              STATUS_EMOJI=":fast_forward:"
+              STATUS_TEXT="SKIPPED"
+              ;;
+            action_required)
+              STATUS_EMOJI=":warning:"
+              STATUS_TEXT="ACTION REQUIRED"
+              ;;
+            neutral)
+              STATUS_EMOJI=":information_source:"
+              STATUS_TEXT="NEUTRAL"
+              ;;
+            *)
+              STATUS_EMOJI=":grey_question:"
+              STATUS_TEXT="${CONCLUSION:-UNKNOWN}"
+              ;;
+          esac
+
+          # Build Slack notification
+          jq -n \
+            --arg emoji "$STATUS_EMOJI" \
+            --arg status "$STATUS_TEXT" \
+            --arg repo "$REPOSITORY" \
+            --arg workflow "$WORKFLOW" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg event "$EVENT" \
+            --arg run "$RUN_NUMBER" \
+            --arg commit "$COMMIT" \
+            --arg failed_jobs "$FAILED_JOBS" \
+            --arg failed_steps "$FAILED_STEPS" \
+            --arg created "$CREATED_AT" \
+            --arg updated "$UPDATED_AT" \
+            --arg url "$RUN_URL" \
+            '{
+              text: "\($emoji) Pipeline \($status): \($workflow)",
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "\($emoji) Pipeline \($status)"
+                  }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    {
+                      type: "mrkdwn",
+                      text: "*Repository:*\n\($repo)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Workflow:*\n\($workflow)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Branch:*\n\($branch)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Final Status:*\n\($status)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Triggered By:*\n\($actor)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Trigger Event:*\n\($event)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Run Number:*\n#\($run)"
+                    },
+                    {
+                      type: "mrkdwn",
+                      text: "*Commit SHA:*\n`\($commit)`"
+                    }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*Failed Jobs:*\n\($failed_jobs)"
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*Failed Steps:*\n\($failed_steps)"
+                  }
+                },
+                {
+                  type: "context",
+                  elements: [
+                    {
+                      type: "mrkdwn",
+                      text: "*Created:* \($created) | *Completed:* \($updated)"
+                    }
+                  ]
+                },
+                {
+                  type: "actions",
+                  elements: [
+                    {
+                      type: "button",
+                      text: {
+                        type: "plain_text",
+                        text: "View Workflow Run"
+                      },
+                      url: $url,
+                      style: "primary"
+                    }
+                  ]
+                }
+              ]
+            }' > payload.json
+
+          echo "Sending pipeline status to Slack..."
+
+          curl --fail-with-body \
+            --silent \
+            --show-error \
+            --retry 3 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data @payload.json \
+            "$SLACK_WEBHOOK_URL"
+
+          echo "Slack notification sent successfully."
