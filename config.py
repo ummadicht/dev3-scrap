@@ -242,23 +242,33 @@ RETRY_BACKOFF_FACTOR = 1.5
 # Used to simulate condition tiers against verified live maximum buyback baseline
 CONDITION_TIERS = {
     "Grade A (Flawless)": {
+        "grade_code": "Grade A",
         "condition_desc": "Like New / Flawless - 100% functional, zero scratches, battery health > 85%",
-        "defects": "None",
+        "defects": "Flawless condition, zero scratches (Repair cost: ₹0)",
         "factor": 1.00,
     },
     "Grade B (Good)": {
+        "grade_code": "Grade B",
         "condition_desc": "Good - Fully functional, minor hairline scratches on body/frame, no dents",
-        "defects": "Minor cosmetic hairline scratches",
+        "defects": "Minor signs of use · Est. QC/Polish cost",
         "factor": 0.88,
     },
     "Grade C (Fair / Average)": {
+        "grade_code": "Grade C",
         "condition_desc": "Average - Fully functional, moderate scratches and minor body dent, battery < 80%",
-        "defects": "Noticeable scratches, minor casing dent, degraded battery",
+        "defects": "Aged battery / housing wear · Est. Battery+Housing repair",
         "factor": 0.72,
     },
-    "Grade D (Defective / Broken)": {
-        "condition_desc": "Defective - Cracks on front display or non-functional camera/touch",
-        "defects": "Cracked front glass / Touchscreen defect",
-        "factor": 0.45,
+    "Grade D (Cracked Screen)": {
+        "grade_code": "Grade D",
+        "condition_desc": "Cracked - Display cracks or lines, functional touch",
+        "defects": "Cracked screen / display lines · Est. Screen replacement cost",
+        "factor": 0.54,
+    },
+    "Grade E (Defective / Board)": {
+        "grade_code": "Grade E",
+        "condition_desc": "Defective - Dead display or logic board / IC faults",
+        "defects": "Dead display + board issue · Est. Board+Screen repair cost",
+        "factor": 0.35,
     },
 }

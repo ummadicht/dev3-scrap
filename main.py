@@ -128,8 +128,17 @@ def run_pipeline(include_matrix: bool = True) -> int:
         ]
         for r in records_dict:
             r["timestamp"] = now_iso
+            
+        # Ingest into all schema tables (interval_reports, devices, repair costs, cashify_buy_prices, observations, runs)
+        ingest_res = db.ingest_cashify_interval_data(records_dict)
         db.upsert_records(records_dict)
-        logger.info("Successfully synced %d records to PostgreSQL (cashify_buy_prices).", len(records_dict))
+        logger.info(
+            "Successfully synced to schema tables: Report ID %s, Bucket: %s, Devices: %d, Rows: %d",
+            ingest_res.get("report_id"),
+            ingest_res.get("report_bucket"),
+            ingest_res.get("devices_processed", 0),
+            ingest_res.get("cashify_rows_added", 0),
+        )
     except Exception as db_err:
         logger.warning("Could not sync to database: %s", db_err)
 

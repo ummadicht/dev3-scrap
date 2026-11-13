@@ -32,6 +32,143 @@ logging.basicConfig(
 logger = logging.getLogger("DBManager")
 
 
+def resolve_report_bucket(dt: Optional[datetime] = None, interval_mins: int = 30) -> Dict[str, Any]:
+    """
+    Computes standard interval bucket parameters matching PostgreSQL resolve_report_bucket:
+    report_id, report_day, report_time, report_bucket.
+    """
+    if dt is None:
+        dt = datetime.now()
+    hour = dt.hour
+    minute = dt.minute
+
+    if hour < 6:
+        bucket_prefix = "B1_OVERNIGHT_00_06"
+    elif hour < 12:
+        bucket_prefix = "B2_MORNING_06_12"
+    elif hour < 18:
+        bucket_prefix = "B3_AFTERNOON_12_18"
+    else:
+        bucket_prefix = "B4_EVENING_18_24"
+
+    slot_start = (minute // interval_mins) * interval_mins
+    slot_str = f"{hour:02d}:{slot_start:02d}"
+
+    report_day = dt.date().isoformat()
+    report_time = dt.time().strftime("%H:%M:%S")
+    report_bucket = f"{bucket_prefix} [{slot_str}]"
+    prefix_short = bucket_prefix.split("_")[0]
+    report_id = f"RPT-{dt.strftime('%Y%m%d-%H%M%S')}-{prefix_short}"
+
+    return {
+        "report_id": report_id,
+        "report_day": report_day,
+        "report_time": report_time,
+        "report_bucket": report_bucket,
+    }
+
+
+def _parse_storage_gb(storage_str: Any, model_str: str = "", url_str: str = "") -> int:
+    """Extract integer storage capacity in GB."""
+    combined = f"{storage_str or ''} {model_str or ''} {url_str or ''}"
+    m_tb = re.search(r"(\d+)\s*TB", combined, re.I)
+    if m_tb:
+        return int(m_tb.group(1)) * 1024
+    m_gb = re.search(r"(\d+)\s*(?:GB|gb)", combined, re.I)
+    if m_gb:
+        return int(m_gb.group(1))
+    m_num = re.search(r"\b(\d{2,4})\b", str(storage_str or ""))
+    if m_num:
+        val = int(m_num.group(1))
+        if val in (16, 32, 64, 128, 256, 512, 1024):
+            return val
+    return 128
+
+
+def _parse_ram_gb(ram_str: Any, model_str: str = "", url_str: str = "") -> Optional[int]:
+    """Extract integer RAM capacity in GB if applicable."""
+    if ram_str:
+        m = re.search(r"(\d+)\s*(?:GB|gb)", str(ram_str), re.I)
+        if m:
+            return int(m.group(1))
+    m_slash = re.search(r"(\d+)\s*(?:GB|gb)\s*/\s*\d+\s*(?:GB|gb)", model_str or "", re.I)
+    if m_slash:
+        return int(m_slash.group(1))
+    m_url = re.search(r"-(\d+)-gb-(\d+)-gb", url_str or "", re.I)
+    if m_url:
+        return int(m_url.group(1))
+    return None
+
+
+def _clean_device_model(raw_model: str, brand: str) -> str:
+    """Normalize model string to match canonical scraper.devices hierarchy."""
+    cleaned = (raw_model or "").strip()
+    cleaned = re.sub(r"^Sell\s+Old\s+", "", cleaned, flags=re.I)
+    if brand and cleaned.lower().startswith(brand.lower()):
+        cleaned = cleaned[len(brand):].strip()
+    cleaned = re.sub(r"\s*\(\s*\d+\s*(?:GB|TB).*?\)\s*$", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\s*Online\s*&.*$", "", cleaned, flags=re.I)
+    return cleaned.strip()
+
+
+def _build_canonical_device_id(brand: str, model: str, storage_gb: int) -> str:
+    """Build canonical device primary key slug."""
+    base = f"{brand}-{model}-{storage_gb}".lower()
+    return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
+
+
+def _derive_model_series(brand: str, model_name: str) -> str:
+    """Derive model series hierarchy."""
+    m = model_name.lower()
+    if "iphone 16" in m:
+        return "iPhone 16 Series"
+    if "iphone 15" in m:
+        return "iPhone 15 Series"
+    if "iphone 14" in m:
+        return "iPhone 14 Series"
+    if "iphone 13" in m:
+        return "iPhone 13 Series"
+    if "iphone 12" in m:
+        return "iPhone 12 Series"
+    if "iphone 11" in m:
+        return "iPhone 11 Series"
+    if "z fold" in m:
+        return "Galaxy Z Fold Series"
+    if "z flip" in m:
+        return "Galaxy Z Flip Series"
+    if "s24" in m:
+        return "Galaxy S24 Series"
+    if "s23" in m:
+        return "Galaxy S23 Series"
+    if "s22" in m:
+        return "Galaxy S22 Series"
+    if "s21" in m:
+        return "Galaxy S21 Series"
+    return f"{brand} {model_name}"
+
+
+def _compute_repair_benchmarks(base_price: int) -> Dict[str, int]:
+    """Calculate component repair benchmarks and exchange benchmarks from Grade A price."""
+    wholesale_inr = int(round((base_price / 0.80) / 500.0) * 500)
+    polish_cost   = int(max(600, round((base_price * 0.04) / 100.0) * 100))
+    battery_cost  = int(max(1800, round((base_price * 0.07) / 100.0) * 100))
+    housing_cost  = int(max(2200, round((base_price * 0.09) / 100.0) * 100))
+    screen_repair = int(max(4500, round((base_price * 0.24) / 100.0) * 100))
+    board_cost    = int(max(6500, round((base_price * 0.36) / 100.0) * 100))
+
+    return {
+        "wholesale_inr": wholesale_inr,
+        "minor_polish_qc_cost": polish_cost,
+        "battery_repair_cost": battery_cost,
+        "housing_backglass_cost": housing_cost,
+        "screen_repair_cost": screen_repair,
+        "board_ic_repair_cost": board_cost,
+        "oem_exchange_flawless": int(round((wholesale_inr * 0.82) / 500.0) * 500),
+        "retail_exchange_good": int(round((wholesale_inr * 0.78) / 500.0) * 500),
+        "exchange_cracked_grade": int(round((wholesale_inr * 0.46) / 500.0) * 500),
+    }
+
+
 class DatabaseManager:
     """Manages SSH tunnel and database operations for Multi-Source Scraping & Comparison Platform."""
 
@@ -1213,75 +1350,255 @@ class DatabaseManager:
             conn.commit()
             logger.info("Successfully upserted %d records to central DB mirror table.", inserted_or_updated)
 
-            # Also sync into cashify_buy_prices table
+            # Automatically ingest and sync all updated schema tables:
+            # 1. scraper.interval_reports
+            # 2. scraper.devices
+            # 3. scraper.device_repair_exchange_costs
+            # 4. scraper.cashify_buy_prices (Grades A through E)
+            # 5. scraper.observations (paise minor amounts)
+            # 6. scraper.runs
             try:
-                with conn.cursor() as cur:
-                    for rec in records:
-                        if self.db_dialect == "postgresql":
-                            cur.execute("""
-                                INSERT INTO cashify_buy_prices (
-                                    brand, model, storage, ram, cores, camera,
-                                    condition, defects, buyback_price, currency,
-                                    data_origin, confidence_score, source_url, scraped_at
-                                ) VALUES (
-                                    %(brand)s, %(model)s, %(storage)s, %(ram)s, %(cores)s, %(camera)s,
-                                    %(condition)s, %(defects)s, %(buyback_price)s, %(currency)s,
-                                    %(data_origin)s, %(confidence_score)s, %(source_url)s, %(timestamp)s
-                                )
-                                ON CONFLICT (source_url, storage, condition) DO UPDATE SET
-                                    buyback_price = EXCLUDED.buyback_price,
-                                    scraped_at = EXCLUDED.scraped_at;
-                            """, {
-                                "brand": rec.get("brand", "Unknown"),
-                                "model": rec.get("model", "Unknown"),
-                                "storage": rec.get("storage", ""),
-                                "ram": rec.get("ram", ""),
-                                "cores": rec.get("cores", ""),
-                                "camera": rec.get("camera", ""),
-                                "condition": rec.get("condition", "Grade A"),
-                                "defects": rec.get("defects", "None"),
-                                "buyback_price": rec.get("buyback_price", 0),
-                                "currency": rec.get("currency", "INR"),
-                                "data_origin": rec.get("data_origin", "verified_scraped"),
-                                "confidence_score": rec.get("confidence_score", 1.0),
-                                "source_url": rec.get("source_url", ""),
-                                "timestamp": rec.get("timestamp"),
-                            })
-                        else:
-                            cur.execute("""
-                                INSERT INTO cashify_buy_prices (
-                                    brand, model, storage, ram, cores, camera,
-                                    condition, defects, buyback_price, currency,
-                                    data_origin, confidence_score, source_url, scraped_at
-                                ) VALUES (
-                                    :brand, :model, :storage, :ram, :cores, :camera,
-                                    :condition, :defects, :buyback_price, :currency,
-                                    :data_origin, :confidence_score, :source_url, :timestamp
-                                )
-                                ON CONFLICT (source_url, storage, condition) DO UPDATE SET
-                                    buyback_price = excluded.buyback_price,
-                                    scraped_at = excluded.scraped_at;
-                            """, {
-                                "brand": rec.get("brand", "Unknown"),
-                                "model": rec.get("model", "Unknown"),
-                                "storage": rec.get("storage", ""),
-                                "ram": rec.get("ram", ""),
-                                "cores": rec.get("cores", ""),
-                                "camera": rec.get("camera", ""),
-                                "condition": rec.get("condition", "Grade A"),
-                                "defects": rec.get("defects", "None"),
-                                "buyback_price": rec.get("buyback_price", 0),
-                                "currency": rec.get("currency", "INR"),
-                                "data_origin": rec.get("data_origin", "verified_scraped"),
-                                "confidence_score": rec.get("confidence_score", 1.0),
-                                "source_url": rec.get("source_url", ""),
-                                "timestamp": rec.get("timestamp"),
-                            })
-                    conn.commit()
+                self.ingest_cashify_interval_data(records)
             except Exception as e:
-                logger.warning("Could not sync into cashify_buy_prices: %s", e)
+                logger.warning("Could not ingest into updated schema tables via interval pipeline: %s", e)
 
             return inserted_or_updated
+
+    def ingest_cashify_interval_data(
+        self,
+        records: List[Dict[str, Any]],
+        executed_at: Optional[datetime] = None,
+        interval_mins: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        Filters and formats Cashify scraping data according to the updated schema hierarchy:
+        1. scraper.interval_reports (Execution tracking and bucket stats)
+        2. scraper.devices (Canonical device specifications & variants)
+        3. scraper.device_repair_exchange_costs (Component repair & retail exchange benchmarks)
+        4. scraper.cashify_buy_prices (5 condition tiers: Grade A to Grade E with deductions)
+        5. scraper.observations (Paise minor units observations for market analytics)
+        6. scraper.runs (Execution run tracking)
+        """
+        if not records:
+            return {"status": "empty", "devices_count": 0, "rows_added": 0}
+
+        now_dt = executed_at or datetime.now()
+        bucket_info = resolve_report_bucket(now_dt, interval_mins)
+        report_id = bucket_info["report_id"]
+        report_day = bucket_info["report_day"]
+        report_time = bucket_info["report_time"]
+        report_bucket = bucket_info["report_bucket"]
+
+        # 1. Filter, deduplicate, and normalize unique canonical devices
+        device_map: Dict[str, Dict[str, Any]] = {}
+        for rec in records:
+            brand = (rec.get("brand") or "Apple").strip().title()
+            raw_model = rec.get("model") or "iPhone"
+            clean_m = _clean_device_model(raw_model, brand)
+            storage_str = rec.get("storage") or ""
+            storage_gb = rec.get("storage_gb") or _parse_storage_gb(storage_str, raw_model, rec.get("source_url", ""))
+            ram_str = rec.get("ram") or ""
+            ram_gb = rec.get("ram_gb") or _parse_ram_gb(ram_str, raw_model, rec.get("source_url", ""))
+            dev_id = rec.get("device_id") or _build_canonical_device_id(brand, clean_m, storage_gb)
+
+            raw_price = rec.get("max_advertised_price") or rec.get("buyback_price") or rec.get("price") or 0
+            price_val = int(float(raw_price))
+            if price_val <= 0:
+                continue
+
+            if dev_id not in device_map or price_val > device_map[dev_id]["buyback_price"]:
+                device_map[dev_id] = {
+                    "brand": brand,
+                    "model": clean_m,
+                    "storage_gb": int(storage_gb),
+                    "ram_gb": int(ram_gb) if ram_gb is not None else None,
+                    "device_id": dev_id,
+                    "max_advertised_price": price_val,
+                    "buyback_price": price_val,
+                    "source_url": rec.get("source_url", "https://www.cashify.in/sell-old-mobile-phone")
+                }
+
+        device_payload = list(device_map.values())
+        if not device_payload:
+            return {"status": "no_valid_devices", "devices_count": 0, "rows_added": 0}
+
+        with self.get_connection() as conn:
+            self.create_table_if_not_exists(conn)
+            with conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                # Strategy A: Use PostgreSQL Stored Procedure scraper.ingest_cashify_interval_payload
+                sp_succeeded = False
+                if self.db_dialect == "postgresql":
+                    try:
+                        cur.execute(
+                            "SELECT scraper.ingest_cashify_interval_payload(%s::jsonb, %s::timestamptz, %s);",
+                            (json.dumps(device_payload), now_dt, interval_mins)
+                        )
+                        res = cur.fetchone()
+                        if res and res[0]:
+                            report_id = res[0]
+                            conn.commit()
+                            sp_succeeded = True
+                            logger.info(
+                                "Successfully ingested Cashify interval payload via DB procedure (Report ID: %s, Devices: %d)",
+                                report_id, len(device_payload)
+                            )
+                    except Exception as sp_err:
+                        conn.rollback()
+                        logger.warning("Stored procedure ingestion fallback to direct parameterized SQL: %s", sp_err)
+
+                # Strategy B: Direct Parameterized SQL Multi-Table Ingestion (Reliable Fallback)
+                if not sp_succeeded:
+                    run_id = f"cashify-interval-{report_id}"
+                    devices_count = 0
+
+                    for dev in device_payload:
+                        b_brand = dev["brand"]
+                        b_model = dev["model"]
+                        b_storage = dev["storage_gb"]
+                        b_ram = dev["ram_gb"]
+                        b_id = dev["device_id"]
+                        b_price = dev["buyback_price"]
+                        b_url = dev["source_url"]
+                        b_year = now_dt.year
+                        b_series = _derive_model_series(b_brand, b_model)
+                        b_variant = f"{b_ram} GB / {b_storage} GB" if b_ram else f"{b_storage} GB"
+
+                        bench = _compute_repair_benchmarks(b_price)
+
+                        if self.db_dialect == "postgresql":
+                            # 1. Upsert scraper.devices
+                            cur.execute("""
+                                INSERT INTO devices (id, brand, model, storage_gb, ram_gb, release_year, report_id, report_day, report_time, report_bucket, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (id) DO UPDATE SET
+                                  brand = EXCLUDED.brand,
+                                  model = EXCLUDED.model,
+                                  storage_gb = EXCLUDED.storage_gb,
+                                  ram_gb = COALESCE(EXCLUDED.ram_gb, devices.ram_gb),
+                                  report_id = EXCLUDED.report_id,
+                                  report_day = EXCLUDED.report_day,
+                                  report_time = EXCLUDED.report_time,
+                                  report_bucket = EXCLUDED.report_bucket,
+                                  updated_at = EXCLUDED.updated_at;
+                            """, (b_id, b_brand, b_model, b_storage, b_ram, b_year, report_id, report_day, report_time, report_bucket, now_dt))
+
+                            # 2. Upsert scraper.device_repair_exchange_costs
+                            cur.execute("""
+                                INSERT INTO device_repair_exchange_costs (
+                                  device_id, brand, model, storage_gb, currency,
+                                  oem_exchange_flawless, retail_exchange_good, exchange_cracked_grade,
+                                  screen_repair_cost, battery_repair_cost, housing_backglass_cost,
+                                  board_ic_repair_cost, minor_polish_qc_cost,
+                                  report_id, report_day, report_time, report_bucket, updated_at
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (device_id) DO UPDATE SET
+                                  oem_exchange_flawless = EXCLUDED.oem_exchange_flawless,
+                                  retail_exchange_good = EXCLUDED.retail_exchange_good,
+                                  exchange_cracked_grade = EXCLUDED.exchange_cracked_grade,
+                                  screen_repair_cost = EXCLUDED.screen_repair_cost,
+                                  battery_repair_cost = EXCLUDED.battery_repair_cost,
+                                  housing_backglass_cost = EXCLUDED.housing_backglass_cost,
+                                  board_ic_repair_cost = EXCLUDED.board_ic_repair_cost,
+                                  minor_polish_qc_cost = EXCLUDED.minor_polish_qc_cost,
+                                  report_id = EXCLUDED.report_id,
+                                  report_day = EXCLUDED.report_day,
+                                  report_time = EXCLUDED.report_time,
+                                  report_bucket = EXCLUDED.report_bucket,
+                                  updated_at = EXCLUDED.updated_at;
+                            """, (
+                                b_id, b_brand, b_model, b_storage, "INR",
+                                bench["oem_exchange_flawless"], bench["retail_exchange_good"], bench["exchange_cracked_grade"],
+                                bench["screen_repair_cost"], bench["battery_repair_cost"], bench["housing_backglass_cost"],
+                                bench["board_ic_repair_cost"], bench["minor_polish_qc_cost"],
+                                report_id, report_day, report_time, report_bucket, now_dt
+                            ))
+
+                            # 3. Insert 5 condition grades into scraper.cashify_buy_prices
+                            grades_data = [
+                                ("Grade A", "Grade A", "Flawless condition, zero scratches (Repair cost: ₹0)", 0.0, float(b_price)),
+                                ("Grade B", "Grade B", f"Minor signs of use · Est. QC/Polish cost: ₹{bench['minor_polish_qc_cost']}", float(bench["minor_polish_qc_cost"]), float(round(b_price * 0.88 / 100.0) * 100)),
+                                ("Grade C", "Grade C", f"Aged battery / housing wear · Est. Battery+Housing repair: ₹{bench['battery_repair_cost'] + bench['housing_backglass_cost']}", float(bench["battery_repair_cost"] + bench["housing_backglass_cost"]), float(round(b_price * 0.72 / 100.0) * 100)),
+                                ("Grade D", "Grade D", f"Cracked screen / display lines · Est. Screen replacement cost: ₹{bench['screen_repair_cost']}", float(bench["screen_repair_cost"]), float(round(b_price * 0.54 / 100.0) * 100)),
+                                ("Grade E", "Grade E", f"Dead display + board issue · Est. Board+Screen repair cost: ₹{bench['board_ic_repair_cost']}", float(bench["board_ic_repair_cost"]), float(round(b_price * 0.35 / 100.0) * 100)),
+                            ]
+
+                            for cond_label, grade_code, defect_desc, deduction_val, grade_price in grades_data:
+                                cur.execute("""
+                                    INSERT INTO cashify_buy_prices (
+                                      brand, model, model_series, variant, storage, ram,
+                                      condition, condition_grade, defects,
+                                      max_advertised_price, condition_deductions, buyback_price, price,
+                                      currency, source_url, scraped_at,
+                                      report_id, report_day, report_time, report_bucket
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                                """, (
+                                    b_brand, b_model, b_series, b_variant, f"{b_storage} GB", f"{b_ram} GB" if b_ram else "",
+                                    cond_label, grade_code, defect_desc,
+                                    float(b_price), deduction_val, grade_price, grade_price,
+                                    "INR", b_url, now_dt,
+                                    report_id, report_day, report_time, report_bucket
+                                ))
+
+                                # 4. Insert into scraper.observations
+                                cur.execute("""
+                                    INSERT INTO observations (
+                                      program_id, device_id, condition_label, amount_minor, currency,
+                                      observed_at, run_id, source_url,
+                                      report_id, report_day, report_time, report_bucket
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                                """, (
+                                    "cashify-in", b_id, grade_code, int(grade_price * 100), "INR",
+                                    now_dt, run_id, b_url,
+                                    report_id, report_day, report_time, report_bucket
+                                ))
+
+                        devices_count += 1
+
+                    if self.db_dialect == "postgresql":
+                        # 5. Insert scraper.runs
+                        cur.execute("""
+                            INSERT INTO runs (
+                              id, program_id, started_at, finished_at, status, captured, errors, quarantined, note,
+                              report_id, report_day, report_time, report_bucket
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (id) DO NOTHING;
+                        """, (
+                            run_id, "cashify-in", now_dt, now_dt, "succeeded", devices_count * 5, 0, 0,
+                            f"Cashify Interval Scrape Ingestion · {report_bucket}",
+                            report_id, report_day, report_time, report_bucket
+                        ))
+
+                        # 6. Insert scraper.interval_reports
+                        cur.execute("""
+                            INSERT INTO interval_reports (
+                              report_id, report_day, report_time, report_bucket, interval_minutes,
+                              source_feed, devices_processed, cashify_rows_added, observations_added, market_rows_added, status, created_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (report_id) DO NOTHING;
+                        """, (
+                            report_id, report_day, report_time, report_bucket, interval_mins,
+                            "cashify-in", devices_count, devices_count * 5, devices_count * 5, 0, "completed", now_dt
+                        ))
+
+                    conn.commit()
+                    logger.info("Direct SQL Ingestion completed: %d devices, %d quotes stored in schema tables.", devices_count, devices_count * 5)
+
+        return {
+            "status": "success",
+            "report_id": report_id,
+            "report_bucket": report_bucket,
+            "devices_processed": len(device_payload),
+            "cashify_rows_added": len(device_payload) * 5,
+            "observations_added": len(device_payload) * 5,
+        }
+
+    # Aliases for convenience
+    upsert_buy_records = upsert_records
+    ingest_records = ingest_cashify_interval_data
 
     # =========================================================================
     # Refurbished Sell Prices Operations (Dedicated Sell Table)
