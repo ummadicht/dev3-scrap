@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows:
       - "PR CI"
-      - "SwapUp Deploy (develop)"
+      - "Scraper Deploy (develop)"
       - "Rollback Service"
     types:
       - completed
