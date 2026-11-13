@@ -498,3 +498,6 @@ class CashifyScraper:
             len(records),
         )
         return records
+
+    # Compatibility alias
+    scrape_device_page = scrape_url

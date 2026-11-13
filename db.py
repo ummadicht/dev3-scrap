@@ -233,9 +233,14 @@ class DatabaseManager:
         self.db_schema = db_schema or os.getenv("DB_SCHEMA", default_schema)
 
         self._tunnel = None
+        self._tunnel_ref_count = 0
 
     def start_tunnel(self) -> int:
         """Starts the SSH tunnel and returns the local assigned port."""
+        if self._tunnel and self._tunnel.is_active:
+            self._tunnel_ref_count += 1
+            return self._tunnel.local_bind_port
+
         from sshtunnel import SSHTunnelForwarder
 
         pkey_path = Path(self.ssh_pkey_path).resolve()
@@ -260,12 +265,18 @@ class DatabaseManager:
             remote_bind_address=("127.0.0.1", self.db_remote_port),
         )
         self._tunnel.start()
+        self._tunnel_ref_count = 1
         local_port = self._tunnel.local_bind_port
         logger.info("SSH tunnel established. Local forwarded port: %d", local_port)
         return local_port
 
     def stop_tunnel(self) -> None:
-        """Closes the active SSH tunnel."""
+        """Closes the active SSH tunnel if no active callers remain."""
+        if self._tunnel_ref_count > 1:
+            self._tunnel_ref_count -= 1
+            return
+
+        self._tunnel_ref_count = 0
         if self._tunnel and self._tunnel.is_active:
             self._tunnel.stop()
             logger.info("SSH tunnel closed.")
@@ -1358,7 +1369,7 @@ class DatabaseManager:
             # 5. scraper.observations (paise minor amounts)
             # 6. scraper.runs
             try:
-                self.ingest_cashify_interval_data(records)
+                self.ingest_cashify_interval_data(records, conn=conn)
             except Exception as e:
                 logger.warning("Could not ingest into updated schema tables via interval pipeline: %s", e)
 
@@ -1369,6 +1380,7 @@ class DatabaseManager:
         records: List[Dict[str, Any]],
         executed_at: Optional[datetime] = None,
         interval_mins: int = 30,
+        conn: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Filters and formats Cashify scraping data according to the updated schema hierarchy:
@@ -1422,9 +1434,10 @@ class DatabaseManager:
         if not device_payload:
             return {"status": "no_valid_devices", "devices_count": 0, "rows_added": 0}
 
-        with self.get_connection() as conn:
-            self.create_table_if_not_exists(conn)
-            with conn.cursor() as cur:
+        def _do_ingest(active_conn: Any) -> str:
+            nonlocal report_id
+            self.create_table_if_not_exists(active_conn)
+            with active_conn.cursor() as cur:
                 schema = self.db_schema
                 if self.db_dialect == "postgresql":
                     cur.execute(f"SET search_path TO {schema}, public;")
@@ -1440,14 +1453,14 @@ class DatabaseManager:
                         res = cur.fetchone()
                         if res and res[0]:
                             report_id = res[0]
-                            conn.commit()
+                            active_conn.commit()
                             sp_succeeded = True
                             logger.info(
                                 "Successfully ingested Cashify interval payload via DB procedure (Report ID: %s, Devices: %d)",
                                 report_id, len(device_payload)
                             )
                     except Exception as sp_err:
-                        conn.rollback()
+                        active_conn.rollback()
                         logger.warning("Stored procedure ingestion fallback to direct parameterized SQL: %s", sp_err)
 
                 # Strategy B: Direct Parameterized SQL Multi-Table Ingestion (Reliable Fallback)
@@ -1584,8 +1597,24 @@ class DatabaseManager:
                             "cashify-in", devices_count, devices_count * 5, devices_count * 5, 0, "completed", now_dt
                         ))
 
-                    conn.commit()
+                    active_conn.commit()
                     logger.info("Direct SQL Ingestion completed: %d devices, %d quotes stored in schema tables.", devices_count, devices_count * 5)
+            return report_id
+
+        if conn is not None:
+            _do_ingest(conn)
+        else:
+            with self.get_connection() as c:
+                _do_ingest(c)
+
+        return {
+            "status": "success",
+            "report_id": report_id,
+            "report_bucket": report_bucket,
+            "devices_processed": len(device_payload),
+            "cashify_rows_added": len(device_payload) * 5,
+            "observations_added": len(device_payload) * 5,
+        }
 
         return {
             "status": "success",

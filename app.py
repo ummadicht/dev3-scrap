@@ -84,12 +84,17 @@ def build_custom_tiers(params: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Build condition tier multipliers from client overrides."""
     tiers = copy.deepcopy(CONDITION_TIERS)
     try:
-        if "grade_b" in params and params["grade_b"] is not None:
+        if "grade_b" in params and params["grade_b"] is not None and "Grade B (Good)" in tiers:
             tiers["Grade B (Good)"]["factor"] = round(float(params["grade_b"]) / 100.0, 4)
-        if "grade_c" in params and params["grade_c"] is not None:
+        if "grade_c" in params and params["grade_c"] is not None and "Grade C (Fair / Average)" in tiers:
             tiers["Grade C (Fair / Average)"]["factor"] = round(float(params["grade_c"]) / 100.0, 4)
         if "grade_d" in params and params["grade_d"] is not None:
-            tiers["Grade D (Defective / Broken)"]["factor"] = round(float(params["grade_d"]) / 100.0, 4)
+            for k in ["Grade D (Cracked Screen)", "Grade D (Defective / Broken)"]:
+                if k in tiers:
+                    tiers[k]["factor"] = round(float(params["grade_d"]) / 100.0, 4)
+                    break
+        if "grade_e" in params and params["grade_e"] is not None and "Grade E (Defective / Board)" in tiers:
+            tiers["Grade E (Defective / Board)"]["factor"] = round(float(params["grade_e"]) / 100.0, 4)
     except (ValueError, TypeError) as exc:
         logger.warning("Invalid custom tier multiplier supplied, using defaults: %s", exc)
     return tiers
@@ -836,11 +841,17 @@ def api_scrape():
             db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="cashify_buyback", records=new_dicts)
             changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="cashify_buyback", records=new_dicts)
             db_manager.finish_scrape_run(run_id, source_id=None, status="SUCCESS", records_count=len(new_dicts), changes_count=len(changes))
-            db_manager.upsert_records(new_dicts)
         except Exception as db_err:
             logger.warning("DB historical logging skipped: %s", db_err)
 
-        # 2. Update files
+        # 2. Upsert to cashify_buy_prices and all schema tables
+        try:
+            db_manager.upsert_records(new_dicts)
+            logger.info("Successfully upserted %d records into scraper.cashify_buy_prices and schema tables.", len(new_dicts))
+        except Exception as up_err:
+            logger.error("Failed to upsert records into scraper.cashify_buy_prices: %s", up_err, exc_info=True)
+
+        # 3. Update files
         existing = load_records()
         scraped_urls = {r.source_url if hasattr(r, "source_url") else r.get("source_url") for r in all_verified}
         existing, updated_count, added_count = upsert_records(
@@ -887,8 +898,9 @@ def api_scrape_all():
                         all_records.extend(src_records)
                 except Exception as src_err:
                     logger.warning("Error scraping source %s (%s): %s", src.get("name"), src.get("target_url"), src_err)
-        else:
-            logger.info("No active DB sources found. Using fallback config.TARGET_DEVICES...")
+
+        if not all_records:
+            logger.info("Database sources returned no records or were empty. Using fallback config.TARGET_DEVICES...")
             scraper = CashifyScraper()
             engine = GradingEngine()
             all_verified: List[MobilePriceRecord] = []
@@ -908,15 +920,21 @@ def api_scrape_all():
         for r in all_records:
             r["timestamp"] = now_iso
 
-        # Historical run in PostgreSQL
+        # 1. Historical run in PostgreSQL
         try:
             run_id = db_manager.start_scrape_run(source_id=None, bucket_name="catalog_buyback")
             db_manager.save_historical_snapshots(run_id, source_id=None, bucket_name="catalog_buyback", records=all_records)
             changes = db_manager.detect_and_record_changes(run_id, source_id=None, bucket_name="catalog_buyback", records=all_records)
             db_manager.finish_scrape_run(run_id, source_id=None, status="SUCCESS", records_count=len(all_records), changes_count=len(changes))
-            db_manager.upsert_records(all_records)
         except Exception as db_err:
             logger.warning("DB logging error: %s", db_err)
+
+        # 2. Upsert to cashify_buy_prices and all schema tables
+        try:
+            db_manager.upsert_records(all_records)
+            logger.info("Successfully upserted %d records into scraper.cashify_buy_prices and schema tables.", len(all_records))
+        except Exception as up_err:
+            logger.error("Failed to upsert records into scraper.cashify_buy_prices: %s", up_err, exc_info=True)
 
         existing = load_records()
         existing, u_count, a_count = upsert_records(existing, all_records, include_matrix=True)

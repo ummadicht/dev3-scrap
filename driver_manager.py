@@ -48,20 +48,14 @@ class CashifyDriver(BaseDriver):
         logger.info("Executing CashifyDriver on URL: %s", target_url)
 
         # 1. Scrape live variants from Cashify
-        verified_records = self.scraper.scrape_device_page(target_url)
+        verified_records = self.scraper.scrape_url(target_url)
         if not verified_records:
             logger.warning("No live records extracted from %s", target_url)
             return []
 
-        all_records: List[Dict[str, Any]] = []
-        for rec in verified_records:
-            rec_dict = rec.model_dump()
-            all_records.append(rec_dict)
-
-            # Generate Grade B, C, D condition tiers
-            simulated = self.grading_engine.generate_graded_records(rec)
-            for sim in simulated:
-                all_records.append(sim.model_dump())
+        # 2. Build full dataset with all 5 condition tiers
+        full_dataset = self.grading_engine.build_full_dataset(verified_records, include_grading_matrix=True)
+        all_records = [r.model_dump() for r in full_dataset]
 
         logger.info("CashifyDriver completed: %d total verified & graded records.", len(all_records))
         return all_records
