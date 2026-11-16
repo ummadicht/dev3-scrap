@@ -212,6 +212,158 @@ TARGET_DEVICES = [
         "model_family": "iPhone 11",
         "url": "https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-11",
     },
+    # --- OnePlus Series ---
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus 12",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-12",
+    },
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus 9 Pro 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-9-pro-5g",
+    },
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus Nord CE 3 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-nord-ce-3-5g",
+    },
+
+    # --- Google Pixel Series ---
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 8 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-8-pro",
+    },
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 8",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-8",
+    },
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 7a",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-7a",
+    },
+
+    # --- Xiaomi & Redmi Series ---
+    {
+        "brand": "Xiaomi",
+        "series": "Xiaomi Series",
+        "model_family": "Xiaomi Mi 11X",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-xiaomi-mi-11x",
+    },
+    {
+        "brand": "Redmi",
+        "series": "Redmi Note Series",
+        "model_family": "Redmi Note 11 Pro Plus 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-redmi-note-11-pro-plus-5g",
+    },
+
+    # --- Vivo & iQOO Series ---
+    {
+        "brand": "Vivo",
+        "series": "Vivo Series",
+        "model_family": "Vivo V30 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-vivo-v30-pro",
+    },
+    {
+        "brand": "Vivo",
+        "series": "Vivo Series",
+        "model_family": "Vivo V29 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-vivo-v29-pro",
+    },
+    {
+        "brand": "iQOO",
+        "series": "iQOO Series",
+        "model_family": "iQOO 12 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-iqoo-12-5g",
+    },
+
+    # --- Motorola Series ---
+    {
+        "brand": "Motorola",
+        "series": "Motorola Series",
+        "model_family": "Moto Edge 30",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-motorola-moto-edge-30",
+    },
+
+    # --- Realme Series ---
+    {
+        "brand": "Realme",
+        "series": "Realme Series",
+        "model_family": "Realme 7",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-realme-7",
+    },
+
+    # --- Nothing Series ---
+    {
+        "brand": "Nothing",
+        "series": "Nothing Series",
+        "model_family": "Nothing Phone 2",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-nothing-phone-2",
+    },
+    {
+        "brand": "Nothing",
+        "series": "Nothing Series",
+        "model_family": "Nothing Phone 1",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-nothing-phone-1",
+    },
+]
+
+# Amazon India Scraping Targets (New & Amazon Renewed Refurbished Mobile Devices)
+DEFAULT_AMAZON_SOURCES = [
+    {
+        "name": "Amazon India - Renewed Smartphones Store",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Amazon Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/s?k=renewed+mobile+phones",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Apple iPhone 15",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Apple-iPhone-15-128-GB/dp/B0CHX1W1XY",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Samsung Galaxy S24 Ultra",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Samsung-Galaxy-Ultra-Titanium-Storage/dp/B0CS5X68S8",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - OnePlus 12",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/OnePlus-Silky-Black-256GB-Storage/dp/B0CQPPV54C",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Renewed Apple iPhone 13",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Amazon Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Renewed-Apple-iPhone-13-128GB/dp/B09V4BHM3X",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
 ]
 
 # Additional API Sources (WholeCellMarket, Wholesale & Buyback Feeds)
@@ -255,6 +407,158 @@ DEFAULT_API_SOURCES = [
         "headers_json": {"Accept": "application/json"},
         "auth_config_json": {"type": "none"},
         "params_json": {"limit": 50},
+        "status": "ACTIVE",
+    },
+    # --- OnePlus Series ---
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus 12",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-12",
+    },
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus 9 Pro 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-9-pro-5g",
+    },
+    {
+        "brand": "OnePlus",
+        "series": "OnePlus Series",
+        "model_family": "OnePlus Nord CE 3 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-oneplus-nord-ce-3-5g",
+    },
+
+    # --- Google Pixel Series ---
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 8 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-8-pro",
+    },
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 8",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-8",
+    },
+    {
+        "brand": "Google",
+        "series": "Pixel Series",
+        "model_family": "Pixel 7a",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-google-pixel-7a",
+    },
+
+    # --- Xiaomi & Redmi Series ---
+    {
+        "brand": "Xiaomi",
+        "series": "Xiaomi Series",
+        "model_family": "Xiaomi Mi 11X",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-xiaomi-mi-11x",
+    },
+    {
+        "brand": "Redmi",
+        "series": "Redmi Note Series",
+        "model_family": "Redmi Note 11 Pro Plus 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-redmi-note-11-pro-plus-5g",
+    },
+
+    # --- Vivo & iQOO Series ---
+    {
+        "brand": "Vivo",
+        "series": "Vivo Series",
+        "model_family": "Vivo V30 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-vivo-v30-pro",
+    },
+    {
+        "brand": "Vivo",
+        "series": "Vivo Series",
+        "model_family": "Vivo V29 Pro",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-vivo-v29-pro",
+    },
+    {
+        "brand": "iQOO",
+        "series": "iQOO Series",
+        "model_family": "iQOO 12 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-iqoo-12-5g",
+    },
+
+    # --- Motorola Series ---
+    {
+        "brand": "Motorola",
+        "series": "Motorola Series",
+        "model_family": "Moto Edge 30",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-motorola-moto-edge-30",
+    },
+
+    # --- Realme Series ---
+    {
+        "brand": "Realme",
+        "series": "Realme Series",
+        "model_family": "Realme 7",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-realme-7",
+    },
+
+    # --- Nothing Series ---
+    {
+        "brand": "Nothing",
+        "series": "Nothing Series",
+        "model_family": "Nothing Phone 2",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-nothing-phone-2",
+    },
+    {
+        "brand": "Nothing",
+        "series": "Nothing Series",
+        "model_family": "Nothing Phone 1",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-nothing-phone-1",
+    },
+]
+
+# Amazon India Scraping Targets (New & Amazon Renewed Refurbished Mobile Devices)
+DEFAULT_AMAZON_SOURCES = [
+    {
+        "name": "Amazon India - Renewed Smartphones Store",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Amazon Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/s?k=renewed+mobile+phones",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Apple iPhone 15",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Apple-iPhone-15-128-GB/dp/B0CHX1W1XY",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Samsung Galaxy S24 Ultra",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Samsung-Galaxy-Ultra-Titanium-Storage/dp/B0CS5X68S8",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - OnePlus 12",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Retail & Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/OnePlus-Silky-Black-256GB-Storage/dp/B0CQPPV54C",
+        "http_method": "GET",
+        "status": "ACTIVE",
+    },
+    {
+        "name": "Amazon India - Renewed Apple iPhone 13",
+        "source_type": "website_amazon",
+        "category": "eCommerce / Amazon Renewed",
+        "bucket_name": "amazon_pricing",
+        "target_url": "https://www.amazon.in/Renewed-Apple-iPhone-13-128GB/dp/B09V4BHM3X",
+        "http_method": "GET",
         "status": "ACTIVE",
     },
 ]

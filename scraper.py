@@ -81,8 +81,11 @@ def extract_base_model_slug(url: str) -> str:
 
 
 def derive_model_series(brand: str, model_name: str) -> str:
-    """Derive model series hierarchy."""
+    """Derive model series hierarchy across all major mobile manufacturers."""
     m = model_name.lower()
+    b = brand.lower()
+
+    # Apple iPhone
     if "iphone 16" in m:
         return "iPhone 16 Series"
     if "iphone 15" in m:
@@ -95,6 +98,10 @@ def derive_model_series(brand: str, model_name: str) -> str:
         return "iPhone 12 Series"
     if "iphone 11" in m:
         return "iPhone 11 Series"
+    if "iphone" in m:
+        return "iPhone Series"
+
+    # Samsung Galaxy
     if "z fold" in m:
         return "Galaxy Z Fold Series"
     if "z flip" in m:
@@ -117,6 +124,77 @@ def derive_model_series(brand: str, model_name: str) -> str:
         return "Galaxy Note 8 Series"
     if "note" in m:
         return "Galaxy Note Series"
+    if "galaxy a" in m:
+        return "Galaxy A Series"
+    if "galaxy f" in m or "galaxy m" in m:
+        return "Galaxy M & F Series"
+
+    # OnePlus
+    if "oneplus" in b or "oneplus" in m:
+        for num in ("13", "12", "11", "10", "9", "8", "7"):
+            if num in m:
+                return f"OnePlus {num} Series"
+        if "nord" in m:
+            return "OnePlus Nord Series"
+        if "open" in m:
+            return "OnePlus Open Series"
+        return "OnePlus Series"
+
+    # Google Pixel
+    if "google" in b or "pixel" in m:
+        for num in ("9", "8", "7", "6"):
+            if num in m:
+                return f"Pixel {num} Series"
+        return "Pixel Series"
+
+    # Xiaomi / Redmi
+    if "redmi" in b or "redmi" in m:
+        if "note" in m:
+            return "Redmi Note Series"
+        return "Redmi Series"
+    if "xiaomi" in b or "xiaomi" in m:
+        return "Xiaomi Flagship Series"
+
+    # Vivo / iQOO
+    if "iqoo" in b or "iqoo" in m:
+        return "iQOO Series"
+    if "vivo" in b or "vivo" in m:
+        if "x" in m:
+            return "Vivo X Series"
+        if "v" in m:
+            return "Vivo V Series"
+        if "t" in m:
+            return "Vivo T Series"
+        return "Vivo Series"
+
+    # Oppo
+    if "oppo" in b or "oppo" in m:
+        if "find" in m:
+            return "Oppo Find Series"
+        if "reno" in m:
+            return "Oppo Reno Series"
+        return "Oppo Series"
+
+    # Realme
+    if "realme" in b or "realme" in m:
+        if "gt" in m:
+            return "Realme GT Series"
+        return "Realme Series"
+
+    # Motorola
+    if "motorola" in b or "moto" in m:
+        if "edge" in m:
+            return "Moto Edge Series"
+        if "razr" in m:
+            return "Moto Razr Series"
+        if "g" in m:
+            return "Moto G Series"
+        return "Motorola Series"
+
+    # Nothing
+    if "nothing" in b or "nothing" in m:
+        return "Nothing Phone Series"
+
     return f"{brand} {model_name}"
 
 
@@ -326,12 +404,21 @@ class CashifyScraper:
         # --------------------------------------------------
         brand = self._extract_brand(soup, html)
         if not brand or brand == "Unknown":
-            if "iphone" in url.lower() or "apple" in url.lower():
-                brand = "Apple"
-            elif "samsung" in url.lower():
-                brand = "Samsung"
+            url_lower = url.lower()
+            known_brands = [
+                ("apple", "Apple"), ("samsung", "Samsung"), ("oneplus", "OnePlus"),
+                ("google", "Google"), ("pixel", "Google"), ("xiaomi", "Xiaomi"),
+                ("redmi", "Redmi"), ("realme", "Realme"), ("vivo", "Vivo"),
+                ("oppo", "Oppo"), ("motorola", "Motorola"), ("moto", "Motorola"),
+                ("nothing", "Nothing"), ("iqoo", "iQOO"), ("poco", "Poco"),
+                ("asus", "Asus"), ("honor", "Honor"), ("nokia", "Nokia")
+            ]
+            for kw, proper_name in known_brands:
+                if kw in url_lower:
+                    brand = proper_name
+                    break
             else:
-                brand = "Apple" if "iphone" in html.lower() else "Samsung"
+                brand = "Apple" if "iphone" in html.lower() else "Unknown"
 
         # --------------------------------------------------
         # 3. Extract and clean model name

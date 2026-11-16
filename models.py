@@ -210,3 +210,42 @@ class CashifySellPriceRecord(BaseModel):
     @classmethod
     def clean_brand(cls, v: str) -> str:
         return v.strip().title()
+
+
+class AmazonPriceRecord(BaseModel):
+    """
+    Represents a mobile device price record scraped from Amazon India (Amazon Retail or Renewed).
+    """
+    model_config = ConfigDict(frozen=False)
+
+    brand: str = Field(..., description="Device brand, e.g. Apple, Samsung, OnePlus, Google")
+    model: str = Field(..., description="Device model name, e.g. iPhone 15, Galaxy S24 Ultra")
+    model_series: Optional[str] = Field(default=None, description="Derived model series hierarchy")
+    variant: Optional[str] = Field(default=None, description="Storage/RAM variant string")
+    storage: Optional[str] = Field(default=None, description="Storage capacity, e.g. 128 GB, 256 GB")
+    ram: Optional[str] = Field(default=None, description="RAM capacity, e.g. 8 GB, 12 GB")
+    color: Optional[str] = Field(default=None, description="Color variant")
+    price: int = Field(..., ge=0, description="Selling price on Amazon in INR")
+    original_mrp: Optional[int] = Field(default=None, ge=0, description="Manufacturer List Price (MRP) in INR")
+    discount_percent: Optional[float] = Field(default=None, ge=0.0, le=100.0, description="Discount percentage vs MRP")
+    is_renewed: bool = Field(default=False, description="True if Amazon Renewed / Refurbished listing")
+    condition: str = Field(default="Brand New", description="Item condition, e.g. Brand New or Amazon Renewed (Good/Excellent)")
+    rating: Optional[str] = Field(default=None, description="Average customer rating out of 5 stars")
+    review_count: Optional[int] = Field(default=None, description="Customer review count")
+    availability: str = Field(default="InStock", description="Availability: InStock, Only X left, Out of stock")
+    asin: Optional[str] = Field(default=None, description="Amazon 10-character Standard Identification Number")
+    seller: Optional[str] = Field(default="Amazon", description="Merchant or fulfillment partner")
+    source_url: str = Field(..., description="Amazon product or search URL")
+    currency: str = Field(default="INR", description="Currency ISO code")
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="ISO 8601 UTC timestamp of scrape"
+    )
+    data_origin: str = Field(default="amazon_scraped", description="Origin flag: amazon_scraped or amazon_market_feed")
+    confidence_score: float = Field(default=1.0, ge=0.0, le=1.0, description="Data extraction confidence score")
+    device_id: Optional[str] = Field(default=None, description="Canonical device identifier matching schema")
+
+    @field_validator("brand")
+    @classmethod
+    def clean_brand(cls, v: str) -> str:
+        return v.strip().title()

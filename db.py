@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import re
 import urllib.parse
 from contextlib import contextmanager
@@ -108,18 +109,25 @@ def _clean_device_model(raw_model: str, brand: str) -> str:
         cleaned = cleaned[len(brand):].strip()
     cleaned = re.sub(r"\s*\(\s*\d+\s*(?:GB|TB).*?\)\s*$", "", cleaned, flags=re.I)
     cleaned = re.sub(r"\s*Online\s*&.*$", "", cleaned, flags=re.I)
-    return cleaned.strip()
+    cleaned = re.sub(r"\b(?:5G|4G|AI Smartphone|Smartphone|Mobile Phone)\b", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:80].strip()
 
 
 def _build_canonical_device_id(brand: str, model: str, storage_gb: int) -> str:
     """Build canonical device primary key slug."""
-    base = f"{brand}-{model}-{storage_gb}".lower()
-    return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
+    clean_m = _clean_device_model(model, brand)
+    base = f"{brand}-{clean_m}-{storage_gb}".lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", base).strip("-")
+    return slug[:140].rstrip("-")
 
 
 def _derive_model_series(brand: str, model_name: str) -> str:
-    """Derive model series hierarchy."""
+    """Derive model series hierarchy across all major mobile manufacturers."""
     m = model_name.lower()
+    b = brand.lower()
+
+    # Apple iPhone
     if "iphone 16" in m:
         return "iPhone 16 Series"
     if "iphone 15" in m:
@@ -132,6 +140,10 @@ def _derive_model_series(brand: str, model_name: str) -> str:
         return "iPhone 12 Series"
     if "iphone 11" in m:
         return "iPhone 11 Series"
+    if "iphone" in m:
+        return "iPhone Series"
+
+    # Samsung Galaxy
     if "z fold" in m:
         return "Galaxy Z Fold Series"
     if "z flip" in m:
@@ -154,6 +166,77 @@ def _derive_model_series(brand: str, model_name: str) -> str:
         return "Galaxy Note 8 Series"
     if "note" in m:
         return "Galaxy Note Series"
+    if "galaxy a" in m:
+        return "Galaxy A Series"
+    if "galaxy f" in m or "galaxy m" in m:
+        return "Galaxy M & F Series"
+
+    # OnePlus
+    if "oneplus" in b or "oneplus" in m:
+        for num in ("13", "12", "11", "10", "9", "8", "7"):
+            if num in m:
+                return f"OnePlus {num} Series"
+        if "nord" in m:
+            return "OnePlus Nord Series"
+        if "open" in m:
+            return "OnePlus Open Series"
+        return "OnePlus Series"
+
+    # Google Pixel
+    if "google" in b or "pixel" in m:
+        for num in ("9", "8", "7", "6"):
+            if num in m:
+                return f"Pixel {num} Series"
+        return "Pixel Series"
+
+    # Xiaomi / Redmi
+    if "redmi" in b or "redmi" in m:
+        if "note" in m:
+            return "Redmi Note Series"
+        return "Redmi Series"
+    if "xiaomi" in b or "xiaomi" in m:
+        return "Xiaomi Flagship Series"
+
+    # Vivo / iQOO
+    if "iqoo" in b or "iqoo" in m:
+        return "iQOO Series"
+    if "vivo" in b or "vivo" in m:
+        if "x" in m:
+            return "Vivo X Series"
+        if "v" in m:
+            return "Vivo V Series"
+        if "t" in m:
+            return "Vivo T Series"
+        return "Vivo Series"
+
+    # Oppo
+    if "oppo" in b or "oppo" in m:
+        if "find" in m:
+            return "Oppo Find Series"
+        if "reno" in m:
+            return "Oppo Reno Series"
+        return "Oppo Series"
+
+    # Realme
+    if "realme" in b or "realme" in m:
+        if "gt" in m:
+            return "Realme GT Series"
+        return "Realme Series"
+
+    # Motorola
+    if "motorola" in b or "moto" in m:
+        if "edge" in m:
+            return "Moto Edge Series"
+        if "razr" in m:
+            return "Moto Razr Series"
+        if "g" in m:
+            return "Moto G Series"
+        return "Motorola Series"
+
+    # Nothing
+    if "nothing" in b or "nothing" in m:
+        return "Nothing Phone Series"
+
     return f"{brand} {model_name}"
 
 
@@ -656,8 +739,8 @@ class DatabaseManager:
     # =========================================================================
 
     def seed_default_sources_if_empty(self) -> int:
-        """Populates scraping_sources from TARGET_DEVICES and DEFAULT_API_SOURCES if not already present."""
-        from config import TARGET_DEVICES, DEFAULT_API_SOURCES
+        """Populates scraping_sources from TARGET_DEVICES, DEFAULT_API_SOURCES, and DEFAULT_AMAZON_SOURCES if not already present."""
+        from config import TARGET_DEVICES, DEFAULT_API_SOURCES, DEFAULT_AMAZON_SOURCES
 
         with self.get_connection() as conn:
             self.create_table_if_not_exists(conn)
@@ -706,6 +789,27 @@ class DatabaseManager:
                             json.dumps(api_src.get("auth_config_json", {})),
                             json.dumps(api_src.get("params_json", {})),
                             api_src.get("status", "ACTIVE"),
+                        ))
+                        existing_urls.add(url)
+                        inserted += 1
+
+                # 3. Seed Amazon India Sources if not present
+                for amz_src in DEFAULT_AMAZON_SOURCES:
+                    url = amz_src.get("target_url", "").strip()
+                    if url and url not in existing_urls:
+                        cur.execute("""
+                            INSERT INTO scraping_sources (
+                                name, source_type, category, bucket_name,
+                                target_url, http_method, status
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s);
+                        """, (
+                            amz_src.get("name"),
+                            amz_src.get("source_type", "website_amazon"),
+                            amz_src.get("category", "eCommerce / Retail & Renewed"),
+                            amz_src.get("bucket_name", "amazon_pricing"),
+                            url,
+                            amz_src.get("http_method", "GET"),
+                            amz_src.get("status", "ACTIVE"),
                         ))
                         existing_urls.add(url)
                         inserted += 1
@@ -1377,9 +1481,19 @@ class DatabaseManager:
             # 3. scraper.device_repair_exchange_costs
             # 4. scraper.cashify_buy_prices (Grades A through E)
             # 5. scraper.observations (paise minor amounts)
-            # 6. scraper.runs
+            # 6. scraper.market_prices (sell-side retail & renewed eCommerce)
+            # 7. scraper.runs
             try:
-                self.ingest_cashify_interval_data(records, conn=conn)
+                is_amazon = any(
+                    "amazon" in str(r.get("source_url", "")).lower()
+                    or "amazon" in str(r.get("data_origin", "")).lower()
+                    or r.get("asin")
+                    for r in records
+                )
+                if is_amazon:
+                    self.ingest_amazon_data(records, conn=conn)
+                else:
+                    self.ingest_cashify_interval_data(records, conn=conn)
             except Exception as e:
                 logger.warning("Could not ingest into updated schema tables via interval pipeline: %s", e)
 
@@ -1626,13 +1740,164 @@ class DatabaseManager:
             "observations_added": len(device_payload) * 5,
         }
 
+    def ingest_amazon_data(
+        self,
+        records: List[Dict[str, Any]],
+        executed_at: Optional[datetime] = None,
+        interval_mins: int = 30,
+        conn: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Ingests scraped Amazon India retail and renewed mobile pricing data
+        into the scraper schema hierarchy:
+        1. scraper.devices (canonical device definitions)
+        2. scraper.observations (normalized price observations, program_id = 'amazon-in')
+        3. scraper.market_prices (sell-side retail/renewed market pricing)
+        4. scraper.runs (execution tracking)
+        5. scraper.interval_reports (aggregate report tracking, market_rows_added)
+        """
+        if not records:
+            return {"status": "empty", "devices_count": 0, "rows_added": 0}
+
+        now_dt = executed_at or datetime.now()
+        bucket_info = resolve_report_bucket(now_dt, interval_mins)
+        report_id = bucket_info["report_id"]
+        report_day = bucket_info["report_day"]
+        report_time = bucket_info["report_time"]
+        report_bucket = bucket_info["report_bucket"]
+        run_id = f"RUN-AMAZON-{now_dt.strftime('%Y%m%d%H%M%S')}-{random.randint(100, 999)}"
+        week_str = f"{now_dt.year}-W{now_dt.isocalendar()[1]:02d}"
+
+        def _do_ingest_amazon(active_conn: Any):
+            self.create_table_if_not_exists(active_conn)
+            with active_conn.cursor() as cur:
+                schema = self.db_schema
+                if self.db_dialect == "postgresql":
+                    cur.execute(f"SET search_path TO {schema}, public;")
+
+                devices_seen = set()
+                market_rows_added = 0
+                obs_rows_added = 0
+
+                for r in records:
+                    brand = (r.get("brand") or "Unknown").strip().title()[:90]
+                    raw_model = r.get("model") or "Device"
+                    clean_m = _clean_device_model(raw_model, brand)[:80]
+                    storage_str = r.get("storage") or ""
+                    storage_gb = r.get("storage_gb") or _parse_storage_gb(storage_str, raw_model, r.get("source_url", ""))
+                    ram_str = r.get("ram") or ""
+                    ram_gb = r.get("ram_gb") or _parse_ram_gb(ram_str, raw_model, r.get("source_url", ""))
+                    dev_id = (r.get("device_id") or _build_canonical_device_id(brand, clean_m, storage_gb))[:140].rstrip("-")
+
+                    raw_price = r.get("price") or r.get("selling_price") or r.get("buyback_price") or 0
+                    price_val = int(float(raw_price))
+                    if price_val <= 0:
+                        continue
+
+                    is_renewed = bool(r.get("is_renewed"))
+                    channel = "amazon-renewed" if is_renewed else "amazon"
+                    cond_code = "Grade A" if is_renewed else "New"
+                    amount_minor = price_val * 100
+                    source_url = r.get("source_url", "https://www.amazon.in")
+
+                    # 1. Upsert into scraper.devices
+                    if dev_id not in devices_seen:
+                        if self.db_dialect == "postgresql":
+                            cur.execute("""
+                                INSERT INTO devices (
+                                    id, brand, model, storage_gb, ram_gb, release_year, aliases,
+                                    report_id, report_day, report_time, report_bucket, updated_at
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (id) DO UPDATE SET
+                                    model = EXCLUDED.model,
+                                    ram_gb = COALESCE(EXCLUDED.ram_gb, devices.ram_gb),
+                                    updated_at = EXCLUDED.updated_at,
+                                    report_id = EXCLUDED.report_id,
+                                    report_day = EXCLUDED.report_day,
+                                    report_time = EXCLUDED.report_time,
+                                    report_bucket = EXCLUDED.report_bucket;
+                            """, (
+                                dev_id, brand, clean_m, storage_gb, ram_gb, 2024,
+                                f"{brand} {clean_m}", report_id, report_day, report_time, report_bucket, now_dt
+                            ))
+                        devices_seen.add(dev_id)
+
+                    # 2. Insert into scraper.observations
+                    cur.execute("""
+                        INSERT INTO observations (
+                            program_id, device_id, condition_label, amount_minor, currency,
+                            observed_at, run_id, source_url,
+                            report_id, report_day, report_time, report_bucket
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    """, (
+                        "amazon-in", dev_id, cond_code, amount_minor, "INR",
+                        now_dt, run_id, source_url,
+                        report_id, report_day, report_time, report_bucket
+                    ))
+                    obs_rows_added += 1
+
+                    # 3. Insert into scraper.market_prices
+                    if self.db_dialect == "postgresql":
+                        cur.execute("""
+                            INSERT INTO market_prices (
+                                device_id, market, channel, cond_lo, cond_hi, amount_minor, currency,
+                                observed_at, sample_size, dispersion_pct, source, entered_by, week,
+                                report_id, report_day, report_time, report_bucket
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        """, (
+                            dev_id, "IN", channel, cond_code, cond_code, amount_minor, "INR",
+                            now_dt, 1, 0.0, "Amazon India", "amazon-scraper", week_str,
+                            report_id, report_day, report_time, report_bucket
+                        ))
+                        market_rows_added += 1
+
+                # 4. Insert into scraper.runs
+                if self.db_dialect == "postgresql":
+                    cur.execute("""
+                        INSERT INTO runs (
+                            id, program_id, started_at, finished_at, status, captured, errors, quarantined, note,
+                            report_id, report_day, report_time, report_bucket
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING;
+                    """, (
+                        run_id, "amazon-in", now_dt, now_dt, "succeeded", market_rows_added, 0, 0,
+                        f"Amazon India Ingestion · {report_bucket}",
+                        report_id, report_day, report_time, report_bucket
+                    ))
+
+                    # 5. Insert or update interval_reports
+                    cur.execute("""
+                        INSERT INTO interval_reports (
+                            report_id, report_day, report_time, report_bucket, interval_minutes,
+                            source_feed, devices_processed, cashify_rows_added, observations_added, market_rows_added, status, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (report_id) DO UPDATE SET
+                            devices_processed = interval_reports.devices_processed + EXCLUDED.devices_processed,
+                            observations_added = interval_reports.observations_added + EXCLUDED.observations_added,
+                            market_rows_added = interval_reports.market_rows_added + EXCLUDED.market_rows_added,
+                            status = 'completed';
+                    """, (
+                        report_id, report_day, report_time, report_bucket, interval_mins,
+                        "amazon-in", len(devices_seen), 0, obs_rows_added, market_rows_added, "completed", now_dt
+                    ))
+
+                active_conn.commit()
+                logger.info(
+                    "Amazon Ingestion completed: %d devices, %d market_prices, %d observations stored in scraper schema.",
+                    len(devices_seen), market_rows_added, obs_rows_added
+                )
+
+        if conn is not None:
+            _do_ingest_amazon(conn)
+        else:
+            with self.get_connection() as c:
+                _do_ingest_amazon(c)
+
         return {
             "status": "success",
             "report_id": report_id,
             "report_bucket": report_bucket,
-            "devices_processed": len(device_payload),
-            "cashify_rows_added": len(device_payload) * 5,
-            "observations_added": len(device_payload) * 5,
+            "devices_processed": len(records),
         }
 
     # Aliases for convenience

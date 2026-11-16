@@ -355,12 +355,33 @@ class GenericHtmlDriver(BaseDriver):
         }]
 
 
+class AmazonDriver(BaseDriver):
+    """Driver for Amazon India retail and renewed (refurbished) mobile listings."""
+
+    def __init__(self):
+        from amazon_scraper import AmazonScraper
+        self.scraper = AmazonScraper()
+
+    def execute(self, source: Dict[str, Any]) -> List[Dict[str, Any]]:
+        target_url = source.get("target_url", "").strip()
+        if not target_url:
+            raise ValueError(f"Source ID {source.get('id')} has empty target_url.")
+
+        logger.info("Executing AmazonDriver on URL: %s", target_url)
+        records = self.scraper.scrape_url(target_url)
+        all_records = [r.model_dump() for r in records]
+        logger.info("AmazonDriver extracted %d listings from %s", len(all_records), target_url)
+        return all_records
+
+
 class DriverManager:
     """Dispatches scraping tasks to the appropriate driver based on source_type."""
 
     def __init__(self):
         self.drivers: Dict[str, BaseDriver] = {
             "website_cashify": CashifyDriver(),
+            "website_amazon": AmazonDriver(),
+            "amazon": AmazonDriver(),
             "rest_api": RestApiDriver(),
             "mobile_api": RestApiDriver(),
             "generic_html": GenericHtmlDriver(),
@@ -371,7 +392,9 @@ class DriverManager:
         driver = self.drivers.get(source_type)
 
         if not driver:
-            if "api" in source_type:
+            if "amazon" in source_type or "amazon" in source.get("target_url", "").lower():
+                driver = self.drivers["website_amazon"]
+            elif "api" in source_type:
                 driver = self.drivers["rest_api"]
             elif "cashify" in source.get("target_url", "").lower():
                 driver = self.drivers["website_cashify"]
