@@ -72,6 +72,14 @@ def build_canonical_device_id(brand: str, model: str, storage_gb: int) -> str:
     return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
 
 
+def extract_base_model_slug(url: str) -> str:
+    """Extract canonical base model slug without prefixes or storage suffix."""
+    slug = urlparse(url).path.rstrip('/').split('/')[-1]
+    slug = re.sub(r'^used(?:-p)?-', '', slug, flags=re.I)
+    slug = re.sub(r'-(?:\d+-gb-)?\d+-(?:gb|tb)$', '', slug, flags=re.I)
+    return slug.lower().strip()
+
+
 def derive_model_series(brand: str, model_name: str) -> str:
     """Derive model series hierarchy."""
     m = model_name.lower()
@@ -99,6 +107,16 @@ def derive_model_series(brand: str, model_name: str) -> str:
         return "Galaxy S22 Series"
     if "s21" in m:
         return "Galaxy S21 Series"
+    if "note 20" in m:
+        return "Galaxy Note 20 Series"
+    if "note 10" in m:
+        return "Galaxy Note 10 Series"
+    if "note 9" in m:
+        return "Galaxy Note 9 Series"
+    if "note 8" in m:
+        return "Galaxy Note 8 Series"
+    if "note" in m:
+        return "Galaxy Note Series"
     return f"{brand} {model_name}"
 
 
@@ -422,6 +440,7 @@ class CashifyScraper:
         # --------------------------------------------------
         # 1. Discover variant URLs
         # --------------------------------------------------
+        base_slug = extract_base_model_slug(url)
         all_variant_urls = set()
 
         # Priority 1: Extract variant links directly from explicit variant container elements [id*="variant"]
@@ -430,7 +449,8 @@ class CashifyScraper:
                 href = a['href']
                 if '/sell-old-mobile-phone/' in href:
                     variant_url = urljoin('https://www.cashify.in', href.split('?')[0])
-                    all_variant_urls.add(variant_url)
+                    if extract_base_model_slug(variant_url) == base_slug:
+                        all_variant_urls.add(variant_url)
 
         # Priority 2: Extract from serialized Next.js productList if available
         if not all_variant_urls:
@@ -438,18 +458,20 @@ class CashifyScraper:
             if pl_match:
                 for slug in re.findall(r'\\"url\\":\\"/sell-old-mobile-phone/([^\\"\s]+)\\"', pl_match.group(1)):
                     variant_url = urljoin('https://www.cashify.in', '/sell-old-mobile-phone/' + slug.split('?')[0])
-                    all_variant_urls.add(variant_url)
+                    if extract_base_model_slug(variant_url) == base_slug:
+                        all_variant_urls.add(variant_url)
 
         # Priority 3: Fallback to anchors containing storage tags that match the base device slug
         if not all_variant_urls:
-            base_slug = url.rstrip('/').split('/')[-1].replace('used-', '')
-            base_keywords = [part for part in base_slug.split('-') if part not in ['5g', '4g', 'fe']]
             for anchor in soup.find_all('a', href=True):
                 href = anchor['href']
                 if '/sell-old-mobile-phone/' in href and re.search(r'\d+-(?:gb|tb)', href, re.IGNORECASE):
-                    if any(kw in href.lower() for kw in base_keywords[:3]):
-                        variant_url = urljoin('https://www.cashify.in', href.split('?')[0])
+                    variant_url = urljoin('https://www.cashify.in', href.split('?')[0])
+                    if extract_base_model_slug(variant_url) == base_slug:
                         all_variant_urls.add(variant_url)
+
+        # Remove self URL so we don't redundantly recurse if current URL is already a variant
+        all_variant_urls.discard(url)
         # --------------------------------------------------
         # 2. Scrape discovered variants
         # --------------------------------------------------

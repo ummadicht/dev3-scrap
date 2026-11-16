@@ -105,22 +105,60 @@ TARGET_DEVICES = [
         "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-s21-fe-5g-8-gb-128-gb",
     },
 
-    # --- Samsung Galaxy Note & A Series ---
+    # --- Samsung Galaxy Note Series ---
     {
         "brand": "Samsung",
-        "series": "Galaxy Note & A Series",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 20 Ultra 5G",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-note-20-ultra-5g-12-gb-256-gb",
+    },
+    {
+        "brand": "Samsung",
+        "series": "Galaxy Note Series",
         "model_family": "Galaxy Note 20",
         "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-note-20-8-gb-256-gb",
     },
     {
         "brand": "Samsung",
-        "series": "Galaxy Note & A Series",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 10 Plus",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-note-10-plus",
+    },
+    {
+        "brand": "Samsung",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 10 Lite",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-note-10-lite",
+    },
+    {
+        "brand": "Samsung",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 10",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-note-10-8-gb-256-gb",
+    },
+    {
+        "brand": "Samsung",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 9",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-p-samsung-galaxy-note-9",
+    },
+    {
+        "brand": "Samsung",
+        "series": "Galaxy Note Series",
+        "model_family": "Galaxy Note 8",
+        "url": "https://www.cashify.in/sell-old-mobile-phone/used-p-samsung-galaxy-note-8",
+    },
+
+    # --- Samsung Galaxy A Series ---
+    {
+        "brand": "Samsung",
+        "series": "Galaxy A Series",
         "model_family": "Galaxy A54 5G",
         "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-a54-5g",
     },
     {
         "brand": "Samsung",
-        "series": "Galaxy Note & A Series",
+        "series": "Galaxy A Series",
         "model_family": "Galaxy A34 5G",
         "url": "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-a34-5g",
     },

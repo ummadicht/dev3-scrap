@@ -144,6 +144,16 @@ def _derive_model_series(brand: str, model_name: str) -> str:
         return "Galaxy S22 Series"
     if "s21" in m:
         return "Galaxy S21 Series"
+    if "note 20" in m:
+        return "Galaxy Note 20 Series"
+    if "note 10" in m:
+        return "Galaxy Note 10 Series"
+    if "note 9" in m:
+        return "Galaxy Note 9 Series"
+    if "note 8" in m:
+        return "Galaxy Note 8 Series"
+    if "note" in m:
+        return "Galaxy Note Series"
     return f"{brand} {model_name}"
 
 
