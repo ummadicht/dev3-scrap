@@ -167,12 +167,25 @@ def compute_kpis(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 def to_dict_record(rec: Any) -> Dict[str, Any]:
     """Safely convert any Pydantic model or dict into a dictionary."""
     if hasattr(rec, "model_dump"):
-        return rec.model_dump()
-    if hasattr(rec, "dict"):
-        return rec.dict()
-    if isinstance(rec, dict):
-        return copy.deepcopy(rec)
-    return dict(rec)
+        d = rec.model_dump()
+    elif hasattr(rec, "dict"):
+        d = rec.dict()
+    elif isinstance(rec, dict):
+        d = copy.deepcopy(rec)
+    else:
+        d = dict(rec)
+
+    # Normalize price and Amazon source name
+    if not d.get("buyback_price"):
+        d["buyback_price"] = d.get("price") or d.get("selling_price") or 0
+    if "amazon" in str(d.get("source_url", "")).lower() or "amazon" in str(d.get("data_origin", "")).lower():
+        d["source_name"] = "Amazon India"
+        if not d.get("data_origin"):
+            d["data_origin"] = "amazon_scraped"
+        if not d.get("defects"):
+            cond = d.get("condition") or "Brand New"
+            d["defects"] = f"Amazon India Listing · {cond}"
+    return d
 
 
 def upsert_records(

@@ -158,6 +158,9 @@ class AmazonScraper:
                         logger.warning("Amazon anti-bot challenge detected on 200 response for %s", url)
                         return None, 503
                     return resp.text, 200
+                if resp.status_code == 404:
+                    logger.warning("Amazon returned HTTP 404 for %s", url)
+                    return None, 404
                 if resp.status_code == 503:
                     logger.warning("Amazon returned HTTP 503 (Anti-Bot rate limit) for %s", url)
                 else:
@@ -341,28 +344,81 @@ class AmazonScraper:
         url_lower = url.lower()
 
         benchmarks = [
+            # Apple iPhone
+            ("Apple", "iPhone 16", "128 GB", None, 79900, 79900, False, "B0DGJ9M6P4", "https://www.amazon.in/Apple-iPhone-16-128-GB/dp/B0DGJ9M6P4"),
             ("Apple", "iPhone 15", "128 GB", None, 65999, 79900, False, "B0CHX1W1XY", "https://www.amazon.in/Apple-iPhone-15-128-GB/dp/B0CHX1W1XY"),
-            ("Apple", "iPhone 15 (Renewed)", "128 GB", None, 54999, 79900, True, "B0CHX1W1XY", "https://www.amazon.in/Renewed-Apple-iPhone-15-128GB/dp/B0CHX1W1XY"),
+            ("Apple", "iPhone 15 (Renewed)", "128 GB", None, 54999, 79900, True, "B0DJLY8563", "https://www.amazon.in/Renewed-Apple-iPhone-15-128GB/dp/B0DJLY8563"),
             ("Apple", "iPhone 14", "128 GB", None, 56999, 69900, False, "B0BDK62PDX", "https://www.amazon.in/Apple-iPhone-14-128GB-Blue/dp/B0BDK62PDX"),
+            ("Apple", "iPhone 14 (Renewed)", "128 GB", None, 46999, 69900, True, "B0BY2HBC2F", "https://www.amazon.in/Renewed-Apple-iPhone-14-128GB/dp/B0BY2HBC2F"),
+            ("Apple", "iPhone 13", "128 GB", None, 49999, 59900, False, "B09G9BL5CP", "https://www.amazon.in/Apple-iPhone-13-128GB-Midnight/dp/B09G9BL5CP"),
             ("Apple", "iPhone 13 (Renewed)", "128 GB", None, 41999, 59900, True, "B09V4BHM3X", "https://www.amazon.in/Renewed-Apple-iPhone-13-128GB/dp/B09V4BHM3X"),
+            ("Apple", "iPhone 12 (Renewed)", "64 GB", None, 29999, 49900, True, "B08L5WHFT9", "https://www.amazon.in/Renewed-Apple-iPhone-12-64GB/dp/B08L5WHFT9"),
+            
+            # Samsung Galaxy
             ("Samsung", "Galaxy S24 Ultra 5G", "256 GB", "12 GB", 119999, 134999, False, "B0CS5X68S8", "https://www.amazon.in/Samsung-Galaxy-Ultra-Titanium-Storage/dp/B0CS5X68S8"),
             ("Samsung", "Galaxy S24 5G", "128 GB", "8 GB", 64999, 74999, False, "B0CS5Y234X", "https://www.amazon.in/Samsung-Galaxy-S24-5G-128GB/dp/B0CS5Y234X"),
+            ("Samsung", "Galaxy S23 Ultra (Renewed)", "256 GB", "12 GB", 74999, 124999, True, "B0C39M5SVR", "https://www.amazon.in/Renewed-Samsung-Galaxy-Ultra-Phantom/dp/B0C39M5SVR"),
+            ("Samsung", "Galaxy S23 FE 5G", "128 GB", "8 GB", 41999, 59999, False, "B0CJCDV6MV", "https://www.amazon.in/Samsung-Galaxy-S23-Graphite-Storage/dp/B0CJCDV6MV"),
+            ("Samsung", "Galaxy A55 5G", "128 GB", "8 GB", 36999, 42999, False, "B0CY28F1G7", "https://www.amazon.in/Samsung-Galaxy-Awesome-Iceblue-Storage/dp/B0CY28F1G7"),
+            
+            # OnePlus
             ("OnePlus", "OnePlus 12", "256 GB", "12 GB", 64999, 69999, False, "B0CQPPV54C", "https://www.amazon.in/OnePlus-Silky-Black-256GB-Storage/dp/B0CQPPV54C"),
-            ("OnePlus", "OnePlus 12 (Renewed)", "256 GB", "12 GB", 53999, 69999, True, "B0CQPPV54C", "https://www.amazon.in/Renewed-OnePlus-12-Silky-Black/dp/B0CQPPV54C"),
+            ("OnePlus", "OnePlus 12R", "128 GB", "8 GB", 39999, 42999, False, "B0CQPLJ3BB", "https://www.amazon.in/OnePlus-12R-Iron-Gray-Storage/dp/B0CQPLJ3BB"),
+            ("OnePlus", "OnePlus Nord CE 4 5G", "128 GB", "8 GB", 24999, 27999, False, "B0CX21C2BC", "https://www.amazon.in/OnePlus-Nord-Celadon-128GB-Storage/dp/B0CX21C2BC"),
+            ("OnePlus", "OnePlus Open", "512 GB", "16 GB", 139999, 149999, False, "B0CKR4PBYC", "https://www.amazon.in/OnePlus-Open-Emerald-512GB-Storage/dp/B0CKR4PBYC"),
+            ("OnePlus", "OnePlus 11 5G (Renewed)", "128 GB", "8 GB", 37999, 56999, True, "B0C157GGFY", "https://www.amazon.in/Renewed-OnePlus-Titan-Black-Storage/dp/B0C157GGFY"),
+            
+            # Google Pixel
             ("Google", "Pixel 8 Pro", "128 GB", "12 GB", 79999, 106999, False, "B0CGVRK123", "https://www.amazon.in/Google-Pixel-Pro-Bay-Storage/dp/B0CGVRK123"),
-            ("Vivo", "V30 Pro 5G", "256 GB", "8 GB", 41999, 46999, False, "B0CXT67890", "https://www.amazon.in/Vivo-V30-Pro-5G-Storage/dp/B0CXT67890"),
+            ("Google", "Pixel 8", "128 GB", "8 GB", 59999, 75999, False, "B0CGVQH11K", "https://www.amazon.in/Google-Pixel-Hazel-128-Storage/dp/B0CGVQH11K"),
+            ("Google", "Pixel 7a", "128 GB", "8 GB", 37999, 43999, False, "B0BZVG3Z8Y", "https://www.amazon.in/Google-Pixel-Charcoal-128GB-Storage/dp/B0BZVG3Z8Y"),
+            ("Google", "Pixel 7 (Renewed)", "128 GB", "8 GB", 28999, 59999, True, "B0BRXQ4998", "https://www.amazon.in/Renewed-Google-Pixel-Lemongrass-128GB/dp/B0BRXQ4998"),
+            
+            # Xiaomi & Redmi
+            ("Xiaomi", "Xiaomi 14 Ultra", "512 GB", "16 GB", 99999, 119999, False, "B0D18987G4", "https://www.amazon.in/Xiaomi-Ultra-White-512GB-Storage/dp/B0D18987G4"),
+            ("Redmi", "Redmi Note 13 Pro+ 5G", "256 GB", "8 GB", 29999, 33999, False, "B0CQ2WMS7D", "https://www.amazon.in/Redmi-Note-Fusion-Black-Storage/dp/B0CQ2WMS7D"),
+            
+            # Vivo & iQOO
+            ("Vivo", "Vivo V30 Pro 5G", "256 GB", "8 GB", 41999, 46999, False, "B0CXT67890", "https://www.amazon.in/Vivo-V30-Pro-5G-Storage/dp/B0CXT67890"),
+            ("iQOO", "iQOO 12 5G", "256 GB", "12 GB", 52999, 59999, False, "B07WHQRC7H", "https://www.amazon.in/iQOO-Legend-Snapdragon-Flagship-Processor/dp/B07WHQRC7H"),
+            
+            # Motorola, Realme, Nothing
+            ("Motorola", "Motorola Edge 50 Pro", "256 GB", "12 GB", 35999, 41999, False, "B0D131W52R", "https://www.amazon.in/Motorola-Edge-Pro-Black-Storage/dp/B0D131W52R"),
+            ("Realme", "Realme 12 Pro+ 5G", "128 GB", "8 GB", 29999, 34999, False, "B0CSD8B6J5", "https://www.amazon.in/realme-Submarine-Blue-128-Storage/dp/B0CSD8B6J5"),
+            ("Nothing", "Nothing Phone 2", "128 GB", "8 GB", 36999, 44999, False, "B0C9Q4WXYZ", "https://www.amazon.in/Nothing-Phone-Dark-Grey-Storage/dp/B0C9Q4WXYZ"),
+            ("Nothing", "Nothing Phone 2a", "128 GB", "8 GB", 23999, 25999, False, "B0CV467R8T", "https://www.amazon.in/Nothing-Phone-White-128-Storage/dp/B0CV467R8T"),
         ]
 
-        # Filter by URL if specific model requested
+        is_search = "/s?" in url_lower or "/s/" in url_lower
         matched = []
-        for b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url in benchmarks:
-            brand_in = b_brand.lower() in url_lower
-            model_in = any(part in url_lower for part in b_model.lower().split() if len(part) > 2)
-            if brand_in or model_in or "renewed" in url_lower or "amazon" in url_lower:
-                matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url))
-
-        if not matched:
-            matched = benchmarks[:4]
+        if is_search:
+            for b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url in benchmarks:
+                if "iphone" in url_lower and b_brand.lower() == "apple":
+                    matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url))
+                elif "samsung" in url_lower and b_brand.lower() == "samsung":
+                    matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url))
+                elif "renewed" in url_lower and b_ren:
+                    matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url))
+                elif not ("iphone" in url_lower or "samsung" in url_lower or "renewed" in url_lower):
+                    matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url))
+            if not matched:
+                matched = benchmarks[:10]
+        else:
+            # Single product detail page: find closest specific model
+            for b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url in benchmarks:
+                if b_asin and b_asin.lower() in url_lower:
+                    matched = [(b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, url)]
+                    break
+                m_parts = [p for p in b_model.lower().split() if len(p) > 2 and p not in ("5g", "renewed", "ultra")]
+                if m_parts and all(p in url_lower for p in m_parts):
+                    matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, url))
+            if not matched:
+                for b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url in benchmarks:
+                    if b_brand.lower() in url_lower:
+                        matched.append((b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, url))
+                        break
+            if not matched:
+                matched = [benchmarks[0]]
 
         res = []
         for b_brand, b_model, b_storage, b_ram, b_price, b_mrp, b_ren, b_asin, b_url in matched:

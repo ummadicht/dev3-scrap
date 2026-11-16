@@ -188,6 +188,15 @@
           <option value="">All Brands</option>
           <option value="Apple">Apple</option>
           <option value="Samsung">Samsung</option>
+          <option value="OnePlus">OnePlus</option>
+          <option value="Google">Google</option>
+          <option value="Xiaomi">Xiaomi</option>
+          <option value="Redmi">Redmi</option>
+          <option value="Vivo">Vivo</option>
+          <option value="iQOO">iQOO</option>
+          <option value="Motorola">Motorola</option>
+          <option value="Realme">Realme</option>
+          <option value="Nothing">Nothing</option>
         </select>
 
         <select id="matrix-storage" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium">
@@ -201,8 +210,8 @@
 
         <select id="matrix-grade" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium">
           <option value="">All Grades</option>
-          <option value="Grade A">Grade A (Like New)</option>
-          <option value="Grade B">Grade B (Good)</option>
+          <option value="Grade A">Grade A (Like New / Retail)</option>
+          <option value="Grade B">Grade B (Good / Renewed)</option>
           <option value="Grade C">Grade C (Fair)</option>
           <option value="Grade D">Grade D (Broken)</option>
         </select>
@@ -210,6 +219,7 @@
         <select id="matrix-source" onchange="filterMatrixTable()" class="py-1.5 pl-3 pr-7 text-xs bg-white border border-slate-200 rounded-xl font-medium font-mono">
           <option value="">All Sources</option>
           <option value="cashify">Cashify</option>
+          <option value="amazon">Amazon</option>
           <option value="wholecell">WholeCellMarket</option>
           <option value="backmarket">BackMarket</option>
           <option value="sellcell">SellCell</option>
@@ -225,9 +235,9 @@
             <th class="px-4 py-3">Brand</th>
             <th class="px-4 py-3">Model & Specifications</th>
             <th class="px-4 py-3">Storage</th>
-            <th class="px-4 py-3 text-right">Buyback Quote</th>
+            <th class="px-4 py-3 text-right">Quote / Price</th>
             <th class="px-4 py-3">Grade</th>
-            <th class="px-4 py-3">Defects</th>
+            <th class="px-4 py-3">Defects / Condition</th>
             <th class="px-4 py-3 text-center">Data Origin</th>
             <th class="px-4 py-3 text-right">Source</th>
           </tr>
@@ -235,14 +245,16 @@
         <tbody class="divide-y divide-slate-100" id="matrix-tbody">
           {% for rec in records %}
           {% set grade_letter = 'A' if 'Grade A' in rec.condition else ('B' if 'Grade B' in rec.condition else ('C' if 'Grade C' in rec.condition else 'D')) %}
-          {% set source_key = (rec.source_name or ('wholecell' if 'wholecell' in (rec.source_url|lower) else ('backmarket' if 'backmarket' in (rec.source_url|lower) else ('sellcell' if 'sellcell' in (rec.source_url|lower) else 'cashify'))))|lower %}
-          {% set source_label = rec.source_name or ('WholeCellMarket' if 'wholecell' in (rec.source_url|lower) else ('BackMarket' if 'backmarket' in (rec.source_url|lower) else ('SellCell' if 'sellcell' in (rec.source_url|lower) else 'Cashify'))) %}
+          {% set s_url_lower = (rec.source_url or '')|lower %}
+          {% set source_key = 'amazon' if ('amazon' in s_url_lower or 'amazon' in (rec.source_name|default('')|lower)) else ('wholecell' if 'wholecell' in s_url_lower else ('backmarket' if 'backmarket' in s_url_lower else ('sellcell' if 'sellcell' in s_url_lower else 'cashify'))) %}
+          {% set source_label = 'Amazon India' if ('amazon' in s_url_lower or 'amazon' in (rec.source_name|default('')|lower)) else ('WholeCellMarket' if 'wholecell' in s_url_lower else ('BackMarket' if 'backmarket' in s_url_lower else ('SellCell' if 'sellcell' in s_url_lower else (rec.source_name or 'Cashify')))) %}
+          {% set price_val = rec.buyback_price or rec.price or rec.selling_price or 0 %}
           <tr class="hover:bg-slate-50/70 transition matrix-row"
               data-brand="{{ rec.brand }}"
               data-model="{{ rec.model|lower }}"
               data-storage="{{ rec.storage }}"
               data-grade="Grade {{ grade_letter }}"
-              data-defects="{{ rec.defects|lower }}"
+              data-defects="{{ (rec.defects or rec.condition or '')|lower }}"
               data-source="{{ source_key }}">
             
             <!-- Brand -->
@@ -251,9 +263,21 @@
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
                 <i class="fa-brands fa-apple text-xs"></i> Apple
               </span>
-              {% else %}
+              {% elif rec.brand == 'Samsung' %}
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 <i class="fa-solid fa-mobile-screen text-xs"></i> Samsung
+              </span>
+              {% elif rec.brand == 'OnePlus' %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                <i class="fa-solid fa-mobile-screen text-xs"></i> OnePlus
+              </span>
+              {% elif rec.brand == 'Google' %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <i class="fa-brands fa-google text-xs"></i> Google
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <i class="fa-solid fa-mobile-screen text-xs"></i> {{ rec.brand }}
               </span>
               {% endif %}
             </td>
@@ -271,17 +295,20 @@
                 {% if rec.camera %}
                 <span class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono border border-emerald-200">{{ rec.camera }}</span>
                 {% endif %}
+                {% if rec.is_renewed %}
+                <span class="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-mono border border-amber-200">Renewed</span>
+                {% endif %}
               </div>
             </td>
 
             <!-- Storage -->
             <td class="px-4 py-3.5 font-mono text-xs font-semibold text-slate-700">
-              {{ rec.storage }}
+              {{ rec.storage or '128 GB' }}
             </td>
 
-            <!-- Buyback Price -->
+            <!-- Buyback / Retail Price -->
             <td class="px-4 py-3.5 text-right">
-              <p class="font-bold text-slate-900 font-mono text-base">₹{{ '{:,}'.format(rec.buyback_price) }}</p>
+              <p class="font-bold text-slate-900 font-mono text-base">₹{{ '{:,}'.format(price_val|int) }}</p>
               <span class="text-[10px] text-slate-400 uppercase font-mono">{{ rec.currency or 'INR' }}</span>
             </td>
 
@@ -299,13 +326,17 @@
             </td>
 
             <!-- Defects -->
-            <td class="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate" title="{{ rec.defects }}">
-              {{ rec.defects }}
+            <td class="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate" title="{{ rec.defects or rec.condition }}">
+              {{ rec.defects or rec.condition }}
             </td>
 
             <!-- Data Origin -->
             <td class="px-4 py-3.5 text-center">
-              {% if rec.data_origin == 'verified_scraped' %}
+              {% if 'amazon' in s_url_lower or 'amazon' in (rec.data_origin|default('')) %}
+              <span class="bg-amber-50 text-amber-800 border border-amber-300 text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-brands fa-amazon text-[11px]"></i> Amazon Live
+              </span>
+              {% elif rec.data_origin == 'verified_scraped' %}
               <span class="badge-active text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                 <i class="fa-solid fa-circle-check text-[10px]"></i> Verified Live
               </span>
@@ -328,7 +359,9 @@
             <td class="px-4 py-3.5 text-right">
               {% set s_url = rec.source_url or '' %}
               {% set clean_m = (rec.model.split('(')[0]|trim)|replace(' 5G', '') %}
-              {% if 'sellcell' in s_url|lower or 'sellcell' in source_label|lower %}
+              {% if 'amazon' in s_url|lower or 'amazon' in source_label|lower %}
+                {% set direct_url = s_url %}
+              {% elif 'sellcell' in s_url|lower or 'sellcell' in source_label|lower %}
                 {% if '/phones/' in s_url or '/search/' in s_url %}
                   {% set direct_url = s_url %}
                 {% else %}
@@ -347,6 +380,9 @@
                 {% set direct_url = s_url or 'https://www.cashify.in' %}
               {% endif %}
               <a href="{{ direct_url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded-lg transition inline-flex items-center gap-1 text-xs font-semibold" title="View exact {{ rec.model }} page on {{ source_label }}">
+                {% if 'amazon' in s_url|lower or 'amazon' in source_label|lower %}
+                <i class="fa-brands fa-amazon text-xs"></i>
+                {% endif %}
                 <span>{{ source_label }}</span>
                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
               </a>
