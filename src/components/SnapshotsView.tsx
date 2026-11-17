@@ -1,0 +1,294 @@
+import { useState } from "react";
+import { Download, Play, Search, X } from "lucide-react";
+import type { NormalizedPriceRecord } from "../types";
+
+interface SnapshotsViewProps {
+  records: NormalizedPriceRecord[];
+  total: number;
+  loading: boolean;
+  phones: string[];
+  sources: string[];
+  selectedPhone: string;
+  selectedSource: string;
+  selectedCondition: string;
+  searchQuery: string;
+  scraping: boolean;
+  scrapeFeedback: string | null;
+  onPhoneChange: (val: string) => void;
+  onSourceChange: (val: string) => void;
+  onConditionChange: (val: string) => void;
+  onSearchChange: (val: string) => void;
+  onRunScrape: () => void;
+  onQuickExportCsv: () => void;
+}
+
+const CONDITIONS = ["all", "new", "like_new", "excellent", "good", "fair", "poor", "unknown"];
+
+function formatCurrency(value: number | null, currency: string): string {
+  if (value === null) return "—";
+  const prefix = currency === "INR" ? "₹" : `${currency} `;
+  return `${prefix}${value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+export function SnapshotsView({
+  records,
+  total,
+  loading,
+  phones,
+  sources,
+  selectedPhone,
+  selectedSource,
+  selectedCondition,
+  searchQuery,
+  scraping,
+  scrapeFeedback,
+  onPhoneChange,
+  onSourceChange,
+  onConditionChange,
+  onSearchChange,
+  onRunScrape,
+  onQuickExportCsv,
+}: SnapshotsViewProps) {
+  const [inspectRecord, setInspectRecord] = useState<NormalizedPriceRecord | null>(null);
+
+  return (
+    <div className="space-y-6">
+      {/* Filter & Scraper Control Bar */}
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:items-end">
+          <div className="md:col-span-3">
+            <label htmlFor="phone-select" className="mb-1.5 block text-xs font-medium text-slate-600">
+              Available Phones
+            </label>
+            <select
+              id="phone-select"
+              value={selectedPhone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
+            >
+              <option value="all">All Available Phones ({phones.length})</option>
+              {phones.map((phone) => (
+                <option key={phone} value={phone}>
+                  {phone}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="source-select" className="mb-1.5 block text-xs font-medium text-slate-600">
+              Source
+            </label>
+            <select
+              id="source-select"
+              value={selectedSource}
+              onChange={(e) => onSourceChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
+            >
+              <option value="all">All Sources</option>
+              {sources.map((src) => (
+                <option key={src} value={src}>
+                  {src}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="condition-select" className="mb-1.5 block text-xs font-medium text-slate-600">
+              Condition
+            </label>
+            <select
+              id="condition-select"
+              value={selectedCondition}
+              onChange={(e) => onConditionChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
+            >
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c === "all" ? "All Conditions" : c.replace("_", " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="snapshot-search" className="mb-1.5 block text-xs font-medium text-slate-600">
+              Search Model or ID
+            </label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
+              <input
+                id="snapshot-search"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="iPhone 15, B0CHX..."
+                className="w-full rounded-md border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-700 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 md:col-span-3 md:justify-end">
+            <button
+              type="button"
+              onClick={onRunScrape}
+              disabled={scraping}
+              className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {scraping ? "Collecting..." : "Scrape Selection"}
+            </button>
+            <button
+              type="button"
+              onClick={onQuickExportCsv}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </button>
+          </div>
+        </div>
+
+        {scrapeFeedback && (
+          <p className="mt-3 text-xs text-slate-600">{scrapeFeedback}</p>
+        )}
+      </section>
+
+      {/* Normalized Snapshots Table */}
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Normalized Price Snapshots</h2>
+            <p className="text-xs text-slate-500">
+              Showing {records.length} of {total} deduplicated records · Click any row to inspect raw payload
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+                <th className="px-4 py-2.5">Device</th>
+                <th className="px-4 py-2.5">Source</th>
+                <th className="px-4 py-2.5">Specs</th>
+                <th className="px-4 py-2.5">Condition</th>
+                <th className="px-4 py-2.5 text-right">Price</th>
+                <th className="px-4 py-2.5 text-right">MRP / Disc</th>
+                <th className="px-4 py-2.5">Stock</th>
+                <th className="px-4 py-2.5 text-right">Captured (UTC)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx}>
+                    <td colSpan={8} className="px-4 py-3">
+                      <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                    </td>
+                  </tr>
+                ))
+              ) : records.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
+                    No matching price snapshots found. Try clearing filters or running a collection pass.
+                  </td>
+                </tr>
+              ) : (
+                records.map((rec, idx) => (
+                  <tr
+                    key={`${rec.source}-${rec.source_product_id}-${rec.condition}-${rec.storage_gb ?? 0}-${idx}`}
+                    onClick={() => setInspectRecord(rec)}
+                    className="cursor-pointer transition-colors hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-slate-900">
+                        {rec.brand} {rec.model}
+                      </div>
+                      <div className="font-mono text-xs text-slate-500">{rec.source_product_id}</div>
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{rec.source}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 tabular-nums">
+                      {[
+                        rec.storage_gb ? `${rec.storage_gb} GB` : null,
+                        rec.ram_gb ? `${rec.ram_gb} GB RAM` : null,
+                        rec.color,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-medium text-slate-700">
+                      {rec.condition.replace("_", " ")}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono font-medium text-slate-900 tabular-nums">
+                      {formatCurrency(rec.price, rec.currency)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600 tabular-nums">
+                      {rec.mrp ? (
+                        <span>
+                          {formatCurrency(rec.mrp, rec.currency)}
+                          {rec.discount_pct !== null ? ` (-${rec.discount_pct}%)` : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600">
+                      {rec.in_stock === true ? (
+                        <span className="text-emerald-700">In stock</span>
+                      ) : rec.in_stock === false ? (
+                        <span className="text-rose-700">Out of stock</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500 tabular-nums">
+                      {rec.captured_at.slice(0, 16).replace("T", " ")}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Raw Payload Inspector Modal */}
+      {inspectRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/30">
+          <div className="flex h-full w-full max-w-xl flex-col border-l border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {inspectRecord.brand} {inspectRecord.model}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {inspectRecord.source} · {inspectRecord.condition} · Run #{inspectRecord.run_id}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectRecord(null)}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close raw payload inspector"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="mb-4 text-xs text-slate-600">
+                Source URL:{" "}
+                <span className="font-mono break-all text-slate-800">{inspectRecord.source_url}</span>
+              </div>
+              <div className="text-xs font-medium text-slate-700 mb-2">Raw Payload JSONB</div>
+              <pre className="overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-4 font-mono text-xs text-slate-800">
+                {JSON.stringify(inspectRecord.raw_payload, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

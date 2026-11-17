@@ -1,0 +1,53 @@
+{
+  "data": {
+    "products": [
+      {
+        "sku_id": "PARTNER-OP12-256-EXC",
+        "device": {
+          "brand": " OnePlus ",
+          "model_name": " OnePlus 12 5G "
+        },
+        "specs": {
+          "storage": "256 GB",
+          "ram": "12 GB",
+          "color": " Flowy Emerald "
+        },
+        "grade": " Excellent ",
+        "pricing": {
+          "offer_price": "44500.00",
+          "currency": " inr ",
+          "retail_mrp": "64999.00"
+        },
+        "availability": {
+          "in_stock": "true"
+        },
+        "listing_url": "https://partner-marketplace.example.com/phones/op12-256"
+      },
+      {
+        "sku_id": "PARTNER-PX8-128-GOOD",
+        "device": {
+          "brand": "Google",
+          "model_name": "Pixel 8"
+        },
+        "specs": {
+          "storage": "128 GB",
+          "ram": "8 GB",
+          "color": "Obsidian"
+        },
+        "grade": "good",
+        "pricing": {
+          "offer_price": 35999,
+          "currency": "INR",
+          "retail_mrp": 75999
+        },
+        "availability": {
+          "in_stock": true
+        },
+        "listing_url": "https://partner-marketplace.example.com/phones/pixel-8-128"
+      }
+    ]
+  },
+  "pagination": {
+    "next_cursor": "cursor-page-2"
+  }
+}

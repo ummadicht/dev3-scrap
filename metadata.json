@@ -1,0 +1,5 @@
+{
+  "name": "Phone Price Scraper & Analytics",
+  "description": "Multi-source mobile phone buyback and resale price collector, time-series normalizer, bucketed CSV exporter, and DoD/WoW/MoM trend analyzer.",
+  "requestFramePermissions": []
+}

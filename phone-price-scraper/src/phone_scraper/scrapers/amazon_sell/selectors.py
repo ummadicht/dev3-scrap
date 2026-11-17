@@ -1,0 +1,5 @@
+WAIT_SELECTOR = "[data-asin], .tradein-device-card, #tradein-offers-container"
+TRADEIN_CARD_SELECTOR = "[data-tradein-offer], .tradein-device-card, div[data-asin]"
+DEVICE_TITLE_SELECTOR = "[data-tradein-title], .tradein-device-title, h2, #productTitle"
+CONDITION_ROW_SELECTOR = "[data-tradein-condition], .tradein-condition-row"
+OFFER_PRICE_SELECTOR = "[data-tradein-price], .tradein-offer-price, .a-price-whole"

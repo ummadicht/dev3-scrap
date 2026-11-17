@@ -1,0 +1,31 @@
+{
+  "data": {
+    "products": [
+      {
+        "sku_id": "PARTNER-IP15PM-1TB-LN",
+        "device": {
+          "brand": "Apple",
+          "model_name": "iPhone 15 Pro Max"
+        },
+        "specs": {
+          "storage": "1 TB",
+          "ram": "8 GB",
+          "color": "Natural Titanium"
+        },
+        "grade": "Mint",
+        "pricing": {
+          "offer_price": 112000,
+          "currency": "INR",
+          "retail_mrp": 199900
+        },
+        "availability": {
+          "in_stock": false
+        },
+        "listing_url": "https://partner-marketplace.example.com/phones/iphone-15-pm-1tb"
+      }
+    ]
+  },
+  "pagination": {
+    "next_cursor": null
+  }
+}

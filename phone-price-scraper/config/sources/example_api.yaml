@@ -1,0 +1,73 @@
+name: example_api
+enabled: true
+url: https://api.partner-marketplace.example.com/v1/phones/buyback-quotes
+method: GET
+params:
+  country: IN
+  category: smartphones
+headers:
+  Accept: application/json
+
+auth:
+  type: bearer
+  token_env: EXAMPLE_API_BEARER_TOKEN
+  # Optional refresh hook if endpoint issues 401 and OAuth2 refresh is desired:
+  # token_url: https://api.partner-marketplace.example.com/oauth/token
+  # client_id_env: PARTNER_OAUTH_CLIENT_ID
+  # client_secret_env: PARTNER_OAUTH_CLIENT_SECRET
+  # scope: "quotes:read"
+
+pagination:
+  type: cursor
+  cursor_param: cursor
+  cursor_path: pagination.next_cursor
+  max_pages: 20
+
+response:
+  items_path: data.products
+
+field_map:
+  source_product_id:
+    path: sku_id
+    transforms: [strip]
+  brand:
+    path: device.brand
+    transforms: [strip]
+  model:
+    path: device.model_name
+    transforms: [strip]
+  storage_gb:
+    path: specs.storage
+    transforms: [parse_storage_gb]
+  ram_gb:
+    path: specs.ram
+    transforms: [parse_ram_gb]
+  color:
+    path: specs.color
+    transforms: [strip]
+  condition:
+    path: grade
+    transforms: [strip, lower, normalize_condition]
+  price:
+    path: pricing.offer_price
+    transforms: [to_float]
+  currency:
+    path: pricing.currency
+    transforms: [strip, upper]
+  mrp:
+    path: pricing.retail_mrp
+    transforms: [to_float]
+  in_stock:
+    path: availability.in_stock
+    transforms: [to_bool]
+  source_url:
+    path: listing_url
+    transforms: [strip]
+
+retry:
+  max_attempts: 3
+  backoff_base_sec: 1.0
+rate_limit:
+  min_delay_sec: 1.0
+  max_delay_sec: 2.5
+timeout: 15.0

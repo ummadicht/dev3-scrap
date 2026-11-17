@@ -1,0 +1,39 @@
+app:
+  default_currency: INR
+  respect_robots_txt: true
+  rate_limit_min_sec: 1.0
+  rate_limit_max_sec: 3.0
+  max_concurrency_per_domain: 2
+  timeout_sec: 20.0
+  max_retries: 3
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+    - "Mozilla/5.0 (X11; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+  proxies: []
+
+sources:
+  cashify_sell:
+    enabled: true
+    use_playwright: true
+    urls:
+      - "https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-15"
+      - "https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-14"
+      - "https://www.cashify.in/sell-old-mobile-phone/used-apple-iphone-13"
+      - "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-s24-ultra-5g-12-gb-256-gb"
+      - "https://www.cashify.in/sell-old-mobile-phone/used-samsung-galaxy-s23-5g"
+
+  cashify_buy:
+    enabled: true
+    use_playwright: true
+    urls:
+      - "https://www.cashify.in/buy-refurbished-mobile-phones/renewed-apple-iphone-13"
+      - "https://www.cashify.in/buy-refurbished-mobile-phones/renewed-apple-iphone-14"
+      - "https://www.cashify.in/buy-refurbished-mobile-phones/renewed-samsung-galaxy-s23-5g"
+
+  amazon_sell:
+    enabled: true
+    use_playwright: true
+    urls:
+      - "https://www.amazon.in/b?node=14026273031"
+      - "https://www.amazon.in/s?k=iphone+15+trade+in"

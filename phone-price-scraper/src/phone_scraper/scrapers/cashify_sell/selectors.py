@@ -1,0 +1,7 @@
+WAIT_SELECTOR = "h1, [itemprop='price'], script#__NEXT_DATA__"
+TITLE_SELECTOR = "h1"
+PRICE_SELECTOR = "[itemprop='price']"
+BRAND_SELECTOR = "[itemprop='brand']"
+NEXT_DATA_SELECTOR = "script#__NEXT_DATA__"
+VARIANT_CONTAINER_SELECTOR = "[id*='variant'] a[href*='/sell-old-mobile-phone/']"
+CONDITION_CARD_SELECTOR = "[data-testid='condition-option'], .condition-grade-card"
