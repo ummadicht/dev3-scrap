@@ -14,7 +14,7 @@ type NormalizedCondition =
   | "unknown";
 
 type ExportGranularity = "daily" | "weekly" | "monthly";
-type MarketSide = "buy" | "sell" | "new";
+type MarketSide = "buy" | "sell" | "new" | "parts";
 
 interface NormalizedPriceRecord {
   side: MarketSide;
@@ -26,6 +26,8 @@ interface NormalizedPriceRecord {
   ram_gb: number | null;
   color: string | null;
   condition: NormalizedCondition;
+  part_category?: string | null;
+  part_name?: string | null;
   price: number;
   currency: string;
   mrp: number | null;
@@ -38,6 +40,7 @@ interface NormalizedPriceRecord {
 }
 
 function classifyMarketSide(source: string, isRenewed?: unknown): MarketSide {
+  if (source === "samsung_parts" || source === "apple_parts") return "parts";
   if (source === "amazon.in" || source === "flipkart") return "new";
   if (source === "Amazon India" && isRenewed === false) return "new";
   if (source === "cashify_buy" || source === "Amazon India") return "buy";
@@ -661,6 +664,170 @@ async function scrapeNewDevicesSource(
     : parseFlipkartNewHtml(html, runId, capturedAt, "fixture_fallback");
 }
 
+function parseAttr(attrs: string, name: string): string | null {
+  const m = attrs.match(new RegExp(`${name}="([^"]*)"`, "i"));
+  return m ? m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").trim() : null;
+}
+
+function parseSamsungPartsHtml(
+  html: string,
+  runId: number,
+  capturedAt: string,
+  fetchMode: "live" | "fixture_fallback" = "fixture_fallback",
+): NormalizedPriceRecord[] {
+  const out: NormalizedPriceRecord[] = [];
+  const rowRe = /<tr\s+class="samsung-part-row"([^>]*)>([\s\S]*?)<\/tr>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = rowRe.exec(html)) !== null) {
+    const attrs = match[1];
+    const brand = parseAttr(attrs, "data-brand") ?? "Samsung";
+    const model = parseAttr(attrs, "data-model") ?? "Unknown";
+    const partId = parseAttr(attrs, "data-part-id") ?? stableProductId("samsung_parts", model, attrs);
+    const partCategory = parseAttr(attrs, "data-category") ?? "Component";
+    const partName = parseAttr(attrs, "data-part-name") ?? "OEM Spare Part";
+    const price = Number((parseAttr(attrs, "data-price") ?? "0").replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const rawMrpVal = Number((parseAttr(attrs, "data-mrp") ?? "").replace(/[^\d.]/g, ""));
+    const mrp = sanitizeMrp(Number.isFinite(rawMrpVal) && rawMrpVal > 0 ? rawMrpVal : null, price);
+    const currency = parseAttr(attrs, "data-currency") ?? "INR";
+    const warranty = parseAttr(attrs, "data-warranty") ?? "90 Days Official Part Warranty";
+    const url =
+      parseAttr(attrs, "data-url") ??
+      "https://www.samsung.com/in/support/spare-part-pricing-list-for-repair/";
+
+    out.push({
+      side: "parts",
+      source: "samsung_parts",
+      source_product_id: partId,
+      brand,
+      model,
+      storage_gb: null,
+      ram_gb: null,
+      color: null,
+      condition: "new",
+      part_category: partCategory,
+      part_name: partName,
+      price,
+      currency,
+      mrp,
+      discount_pct: computeDiscountPct(price, mrp),
+      in_stock: true,
+      source_url: url,
+      captured_at: capturedAt,
+      run_id: runId,
+      raw_payload: {
+        part_code: partId,
+        part_category: partCategory,
+        part_name: partName,
+        warranty,
+        fetch_mode: fetchMode,
+        oem_source: "samsung.com/in",
+      },
+    });
+  }
+  return out;
+}
+
+function parseApplePartsHtml(
+  html: string,
+  runId: number,
+  capturedAt: string,
+  fetchMode: "live" | "fixture_fallback" = "fixture_fallback",
+): NormalizedPriceRecord[] {
+  const out: NormalizedPriceRecord[] = [];
+  const itemRe = /<div\s+class="apple-repair-item"([^>]*)>([\s\S]*?)<\/div>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = itemRe.exec(html)) !== null) {
+    const attrs = match[1];
+    const brand = parseAttr(attrs, "data-brand") ?? "Apple";
+    const model = parseAttr(attrs, "data-model") ?? "Unknown";
+    const partId = parseAttr(attrs, "data-part-id") ?? stableProductId("apple_parts", model, attrs);
+    const partCategory = parseAttr(attrs, "data-category") ?? "Component";
+    const partName = parseAttr(attrs, "data-part-name") ?? "Apple Genuine Part";
+    const price = Number((parseAttr(attrs, "data-price") ?? "0").replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const appleCarePrice = Number((parseAttr(attrs, "data-applecare") ?? "").replace(/[^\d.]/g, ""));
+    const currency = parseAttr(attrs, "data-currency") ?? "INR";
+    const warranty = parseAttr(attrs, "data-warranty") ?? "Apple Genuine Part · 90-Day Service Warranty";
+    const url = parseAttr(attrs, "data-url") ?? "https://support.apple.com/en-in/iphone/repair";
+
+    out.push({
+      side: "parts",
+      source: "apple_parts",
+      source_product_id: partId,
+      brand,
+      model,
+      storage_gb: null,
+      ram_gb: null,
+      color: null,
+      condition: "new",
+      part_category: partCategory,
+      part_name: partName,
+      price,
+      currency,
+      mrp: null,
+      discount_pct: null,
+      in_stock: true,
+      source_url: url,
+      captured_at: capturedAt,
+      run_id: runId,
+      raw_payload: {
+        part_code: partId,
+        part_category: partCategory,
+        part_name: partName,
+        applecare_plus_fee_inr: Number.isFinite(appleCarePrice) ? appleCarePrice : null,
+        warranty,
+        fetch_mode: fetchMode,
+        oem_source: "support.apple.com/en-in",
+      },
+    });
+  }
+  return out;
+}
+
+async function scrapePartsPricingSource(
+  source: "samsung_parts" | "apple_parts",
+  runId: number,
+  capturedAt: string,
+): Promise<NormalizedPriceRecord[]> {
+  const targetUrl =
+    source === "samsung_parts"
+      ? "https://www.samsung.com/in/support/spare-part-pricing-list-for-repair/"
+      : "https://support.apple.com/en-in/iphone/repair";
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "en-IN,en;q=0.9",
+      },
+    });
+    clearTimeout(timer);
+    if (resp.ok) {
+      const html = await resp.text();
+      const parsed =
+        source === "samsung_parts"
+          ? parseSamsungPartsHtml(html, runId, capturedAt, "live")
+          : parseApplePartsHtml(html, runId, capturedAt, "live");
+      if (parsed.length > 0) return parsed;
+    }
+  } catch {
+    // Fallback to official spare-part & repair pricing fixtures when JS-rendered or offline
+  }
+
+  const fixtureFile = source === "samsung_parts" ? "samsung_parts.html" : "apple_parts.html";
+  const fp = path.join(FIXTURES_DIR, fixtureFile);
+  if (!fs.existsSync(fp)) return [];
+  const html = fs.readFileSync(fp, "utf-8");
+  return source === "samsung_parts"
+    ? parseSamsungPartsHtml(html, runId, capturedAt, "fixture_fallback")
+    : parseApplePartsHtml(html, runId, capturedAt, "fixture_fallback");
+}
+
 function loadInitialWorkspaceData(): {
   records: NormalizedPriceRecord[];
   runs: ScrapeRun[];
@@ -837,6 +1004,18 @@ function loadInitialWorkspaceData(): {
       upsert(rec);
     }
   }
+  const samsungPartsPath = path.join(FIXTURES_DIR, "samsung_parts.html");
+  if (fs.existsSync(samsungPartsPath)) {
+    for (const rec of parseSamsungPartsHtml(fs.readFileSync(samsungPartsPath, "utf-8"), 10, fixtureTs)) {
+      upsert(rec);
+    }
+  }
+  const applePartsPath = path.join(FIXTURES_DIR, "apple_parts.html");
+  if (fs.existsSync(applePartsPath)) {
+    for (const rec of parseApplePartsHtml(fs.readFileSync(applePartsPath, "utf-8"), 11, fixtureTs)) {
+      upsert(rec);
+    }
+  }
 
   // 5. Read YAML source configs from phone-price-scraper/config/
   const sourceConfigs: SourceConfigSummary[] = [];
@@ -877,6 +1056,24 @@ function loadInitialWorkspaceData(): {
   }
 
   const runs: ScrapeRun[] = [
+    {
+      id: 11,
+      source: "apple_parts",
+      started_at: "2026-11-17T06:00:00Z",
+      finished_at: "2026-11-17T06:00:03Z",
+      status: "success",
+      records_count: records.filter((r) => r.run_id === 11).length,
+      error_message: null,
+    },
+    {
+      id: 10,
+      source: "samsung_parts",
+      started_at: "2026-11-17T06:00:00Z",
+      finished_at: "2026-11-17T06:00:04Z",
+      status: "success",
+      records_count: records.filter((r) => r.run_id === 10).length,
+      error_message: null,
+    },
     {
       id: 7,
       source: "example_api",
@@ -1151,6 +1348,7 @@ async function startServer(): Promise<void> {
     const buyRecords = state.records.filter((r) => r.side === "buy");
     const sellRecords = state.records.filter((r) => r.side === "sell");
     const newRecords = state.records.filter((r) => r.side === "new");
+    const partsRecords = state.records.filter((r) => r.side === "parts");
     const buyPhones = Array.from(
       new Set(buyRecords.map((r) => `${r.brand} ${r.model}`.trim())),
     ).sort((a, b) => a.localeCompare(b));
@@ -1160,11 +1358,18 @@ async function startServer(): Promise<void> {
     const newPhones = Array.from(
       new Set(newRecords.map((r) => `${r.brand} ${r.model}`.trim())),
     ).sort((a, b) => a.localeCompare(b));
+    const partsPhones = Array.from(
+      new Set(partsRecords.map((r) => `${r.brand} ${r.model}`.trim())),
+    ).sort((a, b) => a.localeCompare(b));
 
     const sources = Array.from(new Set(state.records.map((r) => r.source))).sort();
     const buySources = Array.from(new Set(buyRecords.map((r) => r.source))).sort();
     const sellSources = Array.from(new Set(sellRecords.map((r) => r.source))).sort();
     const newSources = ["amazon.in", "flipkart"];
+    const partsSources = ["apple_parts", "samsung_parts"];
+    const partCategories = Array.from(
+      new Set(partsRecords.map((r) => r.part_category).filter((v): v is string => Boolean(v))),
+    ).sort((a, b) => a.localeCompare(b));
     const latest = state.records
       .map((r) => r.captured_at)
       .sort()
@@ -1182,6 +1387,7 @@ async function startServer(): Promise<void> {
         buy_snapshots: buyRecords.length,
         sell_snapshots: sellRecords.length,
         new_snapshots: newRecords.length,
+        parts_snapshots: partsRecords.length,
         unique_models: phones.length,
         sources_count: sources.length,
         latest_captured_at: latest,
@@ -1191,10 +1397,13 @@ async function startServer(): Promise<void> {
       buy_phones: buyPhones,
       sell_phones: sellPhones,
       new_phones: newPhones,
+      parts_phones: partsPhones,
       sources,
       buy_sources: buySources,
       sell_sources: sellSources,
       new_sources: newSources,
+      parts_sources: partsSources,
+      part_categories: partCategories,
       source_configs: state.sourceConfigs,
       recent_runs: state.runs.slice(0, 12),
     });
@@ -1205,12 +1414,13 @@ async function startServer(): Promise<void> {
     const source = String(req.query.source ?? "all");
     const phone = String(req.query.phone ?? "all");
     const condition = String(req.query.condition ?? "all");
+    const partCategory = String(req.query.part_category ?? "all");
     const q = String(req.query.q ?? "").trim().toLowerCase();
     const limit = Math.min(250, Math.max(1, Number(req.query.limit ?? 100)));
     const offset = Math.max(0, Number(req.query.offset ?? 0));
 
     let filtered = state.records;
-    if (side === "buy" || side === "sell" || side === "new") {
+    if (side === "buy" || side === "sell" || side === "new" || side === "parts") {
       filtered = filtered.filter((r) => r.side === side);
     }
     if (source !== "all") filtered = filtered.filter((r) => r.source === source);
@@ -1218,13 +1428,18 @@ async function startServer(): Promise<void> {
       filtered = filtered.filter((r) => `${r.brand} ${r.model}`.trim() === phone);
     }
     if (condition !== "all") filtered = filtered.filter((r) => r.condition === condition);
+    if (partCategory !== "all") {
+      filtered = filtered.filter((r) => r.part_category === partCategory);
+    }
     if (q) {
       filtered = filtered.filter(
         (r) =>
           r.model.toLowerCase().includes(q) ||
           r.brand.toLowerCase().includes(q) ||
           r.source.toLowerCase().includes(q) ||
-          r.source_product_id.toLowerCase().includes(q),
+          r.source_product_id.toLowerCase().includes(q) ||
+          (r.part_name ?? "").toLowerCase().includes(q) ||
+          (r.part_category ?? "").toLowerCase().includes(q),
       );
     }
 
@@ -1241,8 +1456,66 @@ async function startServer(): Promise<void> {
     const requestedSide = String(req.body?.side ?? "all");
     const requestedSource = String(req.body?.source ?? "all");
     const requestedPhone = String(req.body?.phone ?? "all");
+    const requestedPartCategory = String(req.body?.part_category ?? "all");
     const nowIso = new Date().toISOString();
     const runId = nextRunId++;
+
+    // Parts Pricing tab ONLY scrapes official spare parts / repair pricing from Samsung & Apple
+    if (requestedSide === "parts") {
+      const allowedPartsSources: Array<"samsung_parts" | "apple_parts"> =
+        requestedSource === "samsung_parts" || requestedSource === "apple_parts"
+          ? [requestedSource]
+          : ["samsung_parts", "apple_parts"];
+
+      const collectedParts: NormalizedPriceRecord[] = [];
+      for (const src of allowedPartsSources) {
+        const items = await scrapePartsPricingSource(src, runId, nowIso);
+        collectedParts.push(...items);
+      }
+
+      let filteredParts =
+        requestedPhone === "all"
+          ? collectedParts
+          : collectedParts.filter(
+              (r) =>
+                `${r.brand} ${r.model}`.toLowerCase().includes(requestedPhone.toLowerCase()) ||
+                r.model.toLowerCase().includes(requestedPhone.toLowerCase()),
+            );
+
+      if (requestedPartCategory !== "all") {
+        filteredParts = filteredParts.filter((r) => r.part_category === requestedPartCategory);
+      }
+
+      const todayUtc = nowIso.slice(0, 10);
+      for (const rec of filteredParts) {
+        const idx = state.records.findIndex(
+          (existing) =>
+            existing.source === rec.source &&
+            existing.source_product_id === rec.source_product_id &&
+            existing.condition === rec.condition &&
+            (existing.storage_gb ?? -1) === (rec.storage_gb ?? -1) &&
+            existing.captured_at.slice(0, 10) === todayUtc,
+        );
+        if (idx >= 0) {
+          state.records[idx] = rec;
+        } else {
+          state.records.unshift(rec);
+        }
+      }
+
+      const runRecord: ScrapeRun = {
+        id: runId,
+        source: allowedPartsSources.join(","),
+        started_at: nowIso,
+        finished_at: new Date().toISOString(),
+        status: "success",
+        records_count: filteredParts.length,
+        error_message: null,
+      };
+      state.runs.unshift(runRecord);
+      res.json({ run: runRecord, collected_count: filteredParts.length, records: filteredParts });
+      return;
+    }
 
     // New Devices tab ONLY scrapes brand-new devices from amazon.in and flipkart
     if (requestedSide === "new") {
@@ -1430,10 +1703,13 @@ async function startServer(): Promise<void> {
         const csvContent = toCsv(
           srcRows.map((r) => ({
             run_id: r.run_id,
+            side: r.side,
             source: r.source,
             source_product_id: r.source_product_id,
             brand: r.brand,
             model: r.model,
+            part_category: r.part_category ?? "",
+            part_name: r.part_name ?? "",
             storage_gb: r.storage_gb,
             ram_gb: r.ram_gb,
             color: r.color,
@@ -1494,6 +1770,111 @@ async function startServer(): Promise<void> {
     }
 
     res.json({ granularity, artifacts });
+  });
+
+  const SCHEMA_SQL_PATH = path.join(SCRAPER_DIR, "schema.sql");
+  const DUMP_SQL_PATH = path.join(SCRAPER_DIR, "postgres_migration_dump.sql");
+
+  function sqlLit(val: unknown): string {
+    if (val === null || val === undefined) return "NULL";
+    if (typeof val === "number") return Number.isFinite(val) ? String(val) : "NULL";
+    if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+    return `'${String(val).replace(/'/g, "''")}'`;
+  }
+
+  function writePostgresMigrationDump(): { dumpPath: string; snapshotCount: number; modelCount: number } {
+    const schemaDdl = fs.existsSync(SCHEMA_SQL_PATH)
+      ? fs.readFileSync(SCHEMA_SQL_PATH, "utf-8")
+      : "";
+
+    const lines: string[] = [
+      "-- =============================================================================",
+      "-- Automated PostgreSQL 16 Migration Dump (Schema + All Normalized Records)",
+      `-- Generated At: ${new Date().toISOString()}`,
+      `-- Total Snapshots: ${state.records.length}`,
+      "-- =============================================================================",
+      "BEGIN;",
+      "",
+      schemaDdl.trim(),
+      "",
+      "-- 1. Upsert Scrape Runs",
+    ];
+
+    const runIdsSeen = new Set<number>();
+    for (const r of state.runs) {
+      runIdsSeen.add(r.id);
+      lines.push(
+        `INSERT INTO scrape_runs (id, source, started_at, finished_at, status, records_count, error_message) VALUES (${r.id}, ${sqlLit(r.source)}, ${sqlLit(r.started_at)}, ${sqlLit(r.finished_at)}, ${sqlLit(r.status)}, ${r.records_count}, ${sqlLit(r.error_message)}) ON CONFLICT (id) DO UPDATE SET records_count = EXCLUDED.records_count, finished_at = EXCLUDED.finished_at, status = EXCLUDED.status;`,
+      );
+    }
+    for (const rec of state.records) {
+      const rId = Number(rec.run_id) || 1;
+      if (!runIdsSeen.has(rId)) {
+        runIdsSeen.add(rId);
+        lines.push(
+          `INSERT INTO scrape_runs (id, source, started_at, finished_at, status, records_count, error_message) VALUES (${rId}, ${sqlLit(rec.source)}, ${sqlLit(rec.captured_at)}, ${sqlLit(rec.captured_at)}, 'success', 1, NULL) ON CONFLICT (id) DO NOTHING;`,
+        );
+      }
+    }
+
+    lines.push("", "-- 2. Upsert Phone Models Dimension");
+    const modelMap = new Map<string, number>();
+    let nextModelId = 1;
+    for (const rec of state.records) {
+      const key = `${rec.brand}||${rec.model}`;
+      if (!modelMap.has(key)) {
+        const mId = nextModelId++;
+        modelMap.set(key, mId);
+        lines.push(
+          `INSERT INTO phone_models (id, brand, model) VALUES (${mId}, ${sqlLit(rec.brand)}, ${sqlLit(rec.model)}) ON CONFLICT (brand, model) DO NOTHING;`,
+        );
+      }
+    }
+
+    lines.push("", "-- 3. Upsert Normalized Price & Parts Snapshots");
+    for (const rec of state.records) {
+      const rId = Number(rec.run_id) || 1;
+      const payloadJson = JSON.stringify(rec.raw_payload ?? {}).replace(/'/g, "''");
+      lines.push(
+        `INSERT INTO price_snapshots (run_id, model_id, side, source, source_product_id, brand, model, storage_gb, ram_gb, color, condition, part_category, part_name, price, currency, mrp, discount_pct, in_stock, source_url, captured_at, raw_payload) VALUES (${rId}, (SELECT id FROM phone_models WHERE brand = ${sqlLit(rec.brand)} AND model = ${sqlLit(rec.model)} LIMIT 1), ${sqlLit(rec.side)}, ${sqlLit(rec.source)}, ${sqlLit(rec.source_product_id)}, ${sqlLit(rec.brand)}, ${sqlLit(rec.model)}, ${sqlLit(rec.storage_gb)}, ${sqlLit(rec.ram_gb)}, ${sqlLit(rec.color)}, ${sqlLit(rec.condition)}, ${sqlLit(rec.part_category ?? null)}, ${sqlLit(rec.part_name ?? null)}, ${sqlLit(rec.price)}, ${sqlLit(rec.currency)}, ${sqlLit(rec.mrp)}, ${sqlLit(rec.discount_pct)}, ${sqlLit(rec.in_stock)}, ${sqlLit(rec.source_url)}, ${sqlLit(rec.captured_at)}, '${payloadJson}'::jsonb) ON CONFLICT (source, source_product_id, condition, COALESCE(storage_gb, -1), COALESCE(part_category, ''), ((captured_at AT TIME ZONE 'UTC')::date)) DO UPDATE SET price = EXCLUDED.price, mrp = EXCLUDED.mrp, discount_pct = EXCLUDED.discount_pct, in_stock = EXCLUDED.in_stock, part_name = EXCLUDED.part_name, raw_payload = EXCLUDED.raw_payload;`,
+      );
+    }
+
+    lines.push(
+      "",
+      "SELECT setval('scrape_runs_id_seq', COALESCE((SELECT MAX(id) FROM scrape_runs), 1));",
+      "SELECT setval('phone_models_id_seq', COALESCE((SELECT MAX(id) FROM phone_models), 1));",
+      "SELECT setval('price_snapshots_id_seq', COALESCE((SELECT MAX(id) FROM price_snapshots), 1));",
+      "COMMIT;",
+      "",
+    );
+
+    fs.writeFileSync(DUMP_SQL_PATH, lines.join("\n"), "utf-8");
+    return {
+      dumpPath: "phone-price-scraper/postgres_migration_dump.sql",
+      snapshotCount: state.records.length,
+      modelCount: modelMap.size,
+    };
+  }
+
+  writePostgresMigrationDump();
+
+  app.get("/api/postgres/schema", (_req, res) => {
+    const info = writePostgresMigrationDump();
+    const schemaSql = fs.existsSync(SCHEMA_SQL_PATH)
+      ? fs.readFileSync(SCHEMA_SQL_PATH, "utf-8")
+      : "";
+    res.json({
+      schema_sql: schemaSql,
+      dump_path: info.dumpPath,
+      snapshot_count: info.snapshotCount,
+      model_count: info.modelCount,
+    });
+  });
+
+  app.get("/api/postgres/dump.sql", (_req, res) => {
+    writePostgresMigrationDump();
+    res.download(DUMP_SQL_PATH, "postgres_migration_dump.sql");
   });
 
   app.get("/api/export/download", (req, res) => {

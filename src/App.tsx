@@ -26,6 +26,7 @@ export default function App() {
   const [selectedPhone, setSelectedPhone] = useState("all");
   const [selectedSource, setSelectedSource] = useState("all");
   const [selectedCondition, setSelectedCondition] = useState("all");
+  const [selectedPartCategory, setSelectedPartCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [scraping, setScraping] = useState(false);
   const [scrapeFeedback, setScrapeFeedback] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function App() {
         source: selectedSource,
         phone: selectedPhone,
         condition: selectedCondition,
+        part_category: selectedPartCategory,
         q: searchQuery,
         limit: "150",
       });
@@ -63,7 +65,7 @@ export default function App() {
     } finally {
       setSnapshotsLoading(false);
     }
-  }, [activeSide, selectedSource, selectedPhone, selectedCondition, searchQuery]);
+  }, [activeSide, selectedSource, selectedPhone, selectedCondition, selectedPartCategory, searchQuery]);
 
   const loadTrends = useCallback(async () => {
     setTrendsLoading(true);
@@ -104,6 +106,7 @@ export default function App() {
     setSelectedSource("all");
     setSelectedPhone("all");
     setSelectedCondition("all");
+    setSelectedPartCategory("all");
     setScrapeFeedback(null);
   };
 
@@ -118,6 +121,7 @@ export default function App() {
           side: activeSide,
           source: selectedSource,
           phone: selectedPhone,
+          part_category: selectedPartCategory,
         }),
       });
       if (!resp.ok) throw new Error(`Scrape failed (${resp.status})`);
@@ -141,6 +145,8 @@ export default function App() {
       "source_product_id",
       "brand",
       "model",
+      "part_category",
+      "part_name",
       "storage_gb",
       "ram_gb",
       "color",
@@ -288,26 +294,33 @@ export default function App() {
               buyCount={overview?.kpis.buy_snapshots ?? 0}
               sellCount={overview?.kpis.sell_snapshots ?? 0}
               newCount={overview?.kpis.new_snapshots ?? 0}
+              partsCount={overview?.kpis.parts_snapshots ?? 0}
               records={snapshots}
               total={snapshotsTotal}
               loading={snapshotsLoading}
               phones={
-                activeSide === "new"
-                  ? (overview?.new_phones ?? [])
-                  : activeSide === "buy"
-                    ? (overview?.buy_phones ?? [])
-                    : (overview?.sell_phones ?? [])
+                activeSide === "parts"
+                  ? (overview?.parts_phones ?? [])
+                  : activeSide === "new"
+                    ? (overview?.new_phones ?? [])
+                    : activeSide === "buy"
+                      ? (overview?.buy_phones ?? [])
+                      : (overview?.sell_phones ?? [])
               }
               sources={
-                activeSide === "new"
-                  ? (overview?.new_sources ?? [])
-                  : activeSide === "buy"
-                    ? (overview?.buy_sources ?? [])
-                    : (overview?.sell_sources ?? [])
+                activeSide === "parts"
+                  ? (overview?.parts_sources ?? [])
+                  : activeSide === "new"
+                    ? (overview?.new_sources ?? [])
+                    : activeSide === "buy"
+                      ? (overview?.buy_sources ?? [])
+                      : (overview?.sell_sources ?? [])
               }
+              partCategories={overview?.part_categories ?? []}
               selectedPhone={selectedPhone}
               selectedSource={selectedSource}
               selectedCondition={selectedCondition}
+              selectedPartCategory={selectedPartCategory}
               searchQuery={searchQuery}
               scraping={scraping}
               scrapeFeedback={scrapeFeedback}
@@ -315,6 +328,7 @@ export default function App() {
               onPhoneChange={setSelectedPhone}
               onSourceChange={setSelectedSource}
               onConditionChange={setSelectedCondition}
+              onPartCategoryChange={setSelectedPartCategory}
               onSearchChange={setSearchQuery}
               onRunScrape={handleRunScrape}
               onQuickExportCsv={handleQuickExportCsv}

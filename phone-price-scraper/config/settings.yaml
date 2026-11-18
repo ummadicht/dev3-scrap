@@ -37,3 +37,15 @@ sources:
     urls:
       - "https://www.amazon.in/b?node=14026273031"
       - "https://www.amazon.in/s?k=iphone+15+trade+in"
+
+  samsung_parts:
+    enabled: true
+    use_playwright: true
+    urls:
+      - "https://www.samsung.com/in/support/spare-part-pricing-list-for-repair/"
+
+  apple_parts:
+    enabled: true
+    use_playwright: true
+    urls:
+      - "https://support.apple.com/en-in/iphone/repair"

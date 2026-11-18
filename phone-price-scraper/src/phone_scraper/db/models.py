@@ -65,12 +65,14 @@ class PriceSnapshot(Base):
     __table_args__ = (
         Index("ix_price_snapshots_model_captured", "model_id", "captured_at"),
         Index("ix_price_snapshots_source_captured", "source", "captured_at"),
+        Index("ix_price_snapshots_side_captured", "side", "captured_at"),
         Index(
             "uq_price_snapshots_daily_dedup",
             "source",
             "source_product_id",
             "condition",
             text("COALESCE(storage_gb, -1)"),
+            text("COALESCE(part_category, '')"),
             text("((captured_at AT TIME ZONE 'UTC')::date)"),
             unique=True,
         ),
@@ -80,6 +82,7 @@ class PriceSnapshot(Base):
     run_id: Mapped[int] = mapped_column(ForeignKey("scrape_runs.id", ondelete="CASCADE"), nullable=False)
     model_id: Mapped[int] = mapped_column(ForeignKey("phone_models.id", ondelete="RESTRICT"), nullable=False)
 
+    side: Mapped[str] = mapped_column(String(16), nullable=False, default="sell")
     source: Mapped[str] = mapped_column(String(120), nullable=False)
     source_product_id: Mapped[str] = mapped_column(String(128), nullable=False)
     brand: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -88,6 +91,8 @@ class PriceSnapshot(Base):
     ram_gb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     color: Mapped[str | None] = mapped_column(String(80), nullable=True)
     condition: Mapped[str] = mapped_column(String(32), nullable=False)
+    part_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    part_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     price: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="INR")

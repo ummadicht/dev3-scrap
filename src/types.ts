@@ -8,7 +8,7 @@ export type NormalizedCondition =
   | "unknown";
 
 export type ExportGranularity = "daily" | "weekly" | "monthly";
-export type MarketSide = "buy" | "sell" | "new";
+export type MarketSide = "buy" | "sell" | "new" | "parts";
 
 export interface NormalizedPriceRecord {
   side: MarketSide;
@@ -20,6 +20,8 @@ export interface NormalizedPriceRecord {
   ram_gb: number | null;
   color: string | null;
   condition: NormalizedCondition;
+  part_category?: string | null;
+  part_name?: string | null;
   price: number;
   currency: string;
   mrp: number | null;
@@ -56,6 +58,7 @@ export interface OverviewResponse {
     buy_snapshots: number;
     sell_snapshots: number;
     new_snapshots: number;
+    parts_snapshots: number;
     unique_models: number;
     sources_count: number;
     latest_captured_at: string | null;
@@ -65,10 +68,13 @@ export interface OverviewResponse {
   buy_phones: string[];
   sell_phones: string[];
   new_phones: string[];
+  parts_phones: string[];
   sources: string[];
   buy_sources: string[];
   sell_sources: string[];
   new_sources: string[];
+  parts_sources: string[];
+  part_categories: string[];
   source_configs: SourceConfigSummary[];
   recent_runs: ScrapeRun[];
 }

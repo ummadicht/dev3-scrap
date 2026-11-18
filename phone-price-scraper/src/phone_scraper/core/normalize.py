@@ -99,6 +99,7 @@ def stable_product_id(*parts: str | int | None) -> str:
 class NormalizedPriceRecord(BaseModel):
     """Canonical schema shared by all scrapers and API connectors."""
 
+    side: str = "sell"
     source: str
     source_product_id: str
     brand: str
@@ -107,6 +108,8 @@ class NormalizedPriceRecord(BaseModel):
     ram_gb: int | None = None
     color: str | None = None
     condition: NormalizedCondition = NormalizedCondition.UNKNOWN
+    part_category: str | None = None
+    part_name: str | None = None
     price: float
     currency: str = "INR"
     mrp: float | None = None

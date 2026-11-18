@@ -53,6 +53,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("run_id", sa.Integer(), nullable=False),
         sa.Column("model_id", sa.Integer(), nullable=False),
+        sa.Column("side", sa.String(length=16), nullable=False, server_default="sell"),
         sa.Column("source", sa.String(length=120), nullable=False),
         sa.Column("source_product_id", sa.String(length=128), nullable=False),
         sa.Column("brand", sa.String(length=80), nullable=False),
@@ -61,6 +62,8 @@ def upgrade() -> None:
         sa.Column("ram_gb", sa.Integer(), nullable=True),
         sa.Column("color", sa.String(length=80), nullable=True),
         sa.Column("condition", sa.String(length=32), nullable=False),
+        sa.Column("part_category", sa.String(length=80), nullable=True),
+        sa.Column("part_name", sa.String(length=200), nullable=True),
         sa.Column("price", sa.Float(), nullable=False),
         sa.Column("currency", sa.String(length=10), nullable=False),
         sa.Column("mrp", sa.Float(), nullable=True),
@@ -89,6 +92,12 @@ def upgrade() -> None:
         ["source", "captured_at"],
         unique=False,
     )
+    op.create_index(
+        "ix_price_snapshots_side_captured",
+        "price_snapshots",
+        ["side", "captured_at"],
+        unique=False,
+    )
     op.execute(
         """
         CREATE UNIQUE INDEX uq_price_snapshots_daily_dedup
@@ -97,6 +106,7 @@ def upgrade() -> None:
             source_product_id,
             condition,
             COALESCE(storage_gb, -1),
+            COALESCE(part_category, ''),
             ((captured_at AT TIME ZONE 'UTC')::date)
         );
         """
@@ -112,6 +122,7 @@ def downgrade() -> None:
     op.execute("DROP VIEW IF EXISTS price_weekly;")
     op.execute("DROP VIEW IF EXISTS price_daily;")
     op.execute("DROP INDEX IF EXISTS uq_price_snapshots_daily_dedup;")
+    op.drop_index("ix_price_snapshots_side_captured", table_name="price_snapshots")
     op.drop_index("ix_price_snapshots_source_captured", table_name="price_snapshots")
     op.drop_index("ix_price_snapshots_model_captured", table_name="price_snapshots")
     op.drop_table("price_snapshots")

@@ -62,6 +62,7 @@ class PriceRepository:
                 PriceSnapshot(
                     run_id=run_id,
                     model_id=phone_model.id,
+                    side=rec.side,
                     source=rec.source,
                     source_product_id=rec.source_product_id,
                     brand=rec.brand,
@@ -70,6 +71,8 @@ class PriceRepository:
                     ram_gb=rec.ram_gb,
                     color=rec.color,
                     condition=rec.condition.value,
+                    part_category=rec.part_category,
+                    part_name=rec.part_name,
                     price=rec.price,
                     currency=rec.currency,
                     mrp=rec.mrp,
@@ -98,13 +101,15 @@ class PriceRepository:
                 text(
                     """
                     INSERT INTO price_snapshots (
-                        run_id, model_id, source, source_product_id,
+                        run_id, model_id, side, source, source_product_id,
                         brand, model, storage_gb, ram_gb, color, condition,
+                        part_category, part_name,
                         price, currency, mrp, discount_pct, in_stock,
                         source_url, captured_at, raw_payload
                     ) VALUES (
-                        :run_id, :model_id, :source, :source_product_id,
+                        :run_id, :model_id, :side, :source, :source_product_id,
                         :brand, :model, :storage_gb, :ram_gb, :color, :condition,
+                        :part_category, :part_name,
                         :price, :currency, :mrp, :discount_pct, :in_stock,
                         :source_url, :captured_at, CAST(:raw_payload AS jsonb)
                     )
@@ -113,10 +118,13 @@ class PriceRepository:
                         source_product_id,
                         condition,
                         COALESCE(storage_gb, -1),
+                        COALESCE(part_category, ''),
                         ((captured_at AT TIME ZONE 'UTC')::date)
                     )
                     DO UPDATE SET
                         run_id = EXCLUDED.run_id,
+                        side = EXCLUDED.side,
+                        part_name = EXCLUDED.part_name,
                         price = EXCLUDED.price,
                         mrp = EXCLUDED.mrp,
                         discount_pct = EXCLUDED.discount_pct,
@@ -127,6 +135,7 @@ class PriceRepository:
                 {
                     "run_id": run_id,
                     "model_id": phone_model.id,
+                    "side": rec.side,
                     "source": rec.source,
                     "source_product_id": rec.source_product_id,
                     "brand": rec.brand,
@@ -135,6 +144,8 @@ class PriceRepository:
                     "ram_gb": rec.ram_gb,
                     "color": rec.color,
                     "condition": rec.condition.value,
+                    "part_category": rec.part_category,
+                    "part_name": rec.part_name,
                     "price": rec.price,
                     "currency": rec.currency,
                     "mrp": rec.mrp,
