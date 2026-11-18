@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Database, FileSpreadsheet, Layers, TrendingUp } from "lucide-react";
+import { Database, FileSpreadsheet, HelpCircle, Layers, TrendingUp } from "lucide-react";
 import { ExportsView } from "./components/ExportsView";
+import { HelpView } from "./components/HelpView";
 import { SnapshotsView } from "./components/SnapshotsView";
 import { SourcesView } from "./components/SourcesView";
 import { TrendsView } from "./components/TrendsView";
@@ -13,7 +14,7 @@ import type {
   TrendRow,
 } from "./types";
 
-type ActiveTab = "snapshots" | "trends" | "exports" | "sources";
+type ActiveTab = "snapshots" | "trends" | "exports" | "sources" | "help";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("snapshots");
@@ -186,6 +187,7 @@ export default function App() {
     { id: "trends", label: "Trend Analytics", icon: TrendingUp },
     { id: "exports", label: "Bucketed Exports", icon: FileSpreadsheet },
     { id: "sources", label: "Sources & Runs", icon: Layers },
+    { id: "help", label: "Help & Docs", icon: HelpCircle },
   ];
 
   const tabTitles: Record<ActiveTab, string> = {
@@ -193,6 +195,7 @@ export default function App() {
     trends: "DoD / WoW / MoM Trends",
     exports: "Date-Bucketed CSV Archives",
     sources: "Configured Sources & Runs",
+    help: "Documentation & User Guide",
   };
 
   return (
@@ -362,6 +365,8 @@ export default function App() {
               }}
             />
           )}
+
+          {activeTab === "help" && <HelpView />}
         </main>
       </div>
     </div>
