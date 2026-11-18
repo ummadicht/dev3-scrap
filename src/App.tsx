@@ -6,6 +6,7 @@ import { SourcesView } from "./components/SourcesView";
 import { TrendsView } from "./components/TrendsView";
 import type {
   ExportGranularity,
+  MarketSide,
   NormalizedPriceRecord,
   OverviewResponse,
   SnapshotsResponse,
@@ -21,6 +22,7 @@ export default function App() {
   const [snapshotsTotal, setSnapshotsTotal] = useState(0);
   const [snapshotsLoading, setSnapshotsLoading] = useState(true);
 
+  const [activeSide, setActiveSide] = useState<MarketSide>("buy");
   const [selectedPhone, setSelectedPhone] = useState("all");
   const [selectedSource, setSelectedSource] = useState("all");
   const [selectedCondition, setSelectedCondition] = useState("all");
@@ -45,6 +47,7 @@ export default function App() {
     setSnapshotsLoading(true);
     try {
       const params = new URLSearchParams({
+        side: activeSide,
         source: selectedSource,
         phone: selectedPhone,
         condition: selectedCondition,
@@ -60,7 +63,7 @@ export default function App() {
     } finally {
       setSnapshotsLoading(false);
     }
-  }, [selectedSource, selectedPhone, selectedCondition, searchQuery]);
+  }, [activeSide, selectedSource, selectedPhone, selectedCondition, searchQuery]);
 
   const loadTrends = useCallback(async () => {
     setTrendsLoading(true);
@@ -96,6 +99,14 @@ export default function App() {
     }
   }, [activeTab, loadTrends]);
 
+  const handleSideChange = (nextSide: MarketSide) => {
+    setActiveSide(nextSide);
+    setSelectedSource("all");
+    setSelectedPhone("all");
+    setSelectedCondition("all");
+    setScrapeFeedback(null);
+  };
+
   const handleRunScrape = async () => {
     setScraping(true);
     setScrapeFeedback(null);
@@ -103,12 +114,16 @@ export default function App() {
       const resp = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: selectedSource, phone: selectedPhone }),
+        body: JSON.stringify({
+          side: activeSide,
+          source: selectedSource,
+          phone: selectedPhone,
+        }),
       });
       if (!resp.ok) throw new Error(`Scrape failed (${resp.status})`);
       const data = (await resp.json()) as { collected_count: number; run: { id: number } };
       setScrapeFeedback(
-        `Run #${data.run.id} completed: ${data.collected_count} normalized records upserted.`,
+        `Run #${data.run.id} completed: ${data.collected_count} normalized ${activeSide} records upserted.`,
       );
       await Promise.all([loadOverview(), loadSnapshots()]);
     } catch (err) {
@@ -121,6 +136,7 @@ export default function App() {
   const handleQuickExportCsv = () => {
     if (snapshots.length === 0) return;
     const headers = [
+      "side",
       "source",
       "source_product_id",
       "brand",
@@ -154,7 +170,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${selectedSource === "all" ? "all_sources" : selectedSource}_snapshots.csv`;
+    a.download = `${activeSide}_${selectedSource === "all" ? "all_sources" : selectedSource}_snapshots.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -268,17 +284,34 @@ export default function App() {
 
           {activeTab === "snapshots" && (
             <SnapshotsView
+              activeSide={activeSide}
+              buyCount={overview?.kpis.buy_snapshots ?? 0}
+              sellCount={overview?.kpis.sell_snapshots ?? 0}
+              newCount={overview?.kpis.new_snapshots ?? 0}
               records={snapshots}
               total={snapshotsTotal}
               loading={snapshotsLoading}
-              phones={overview?.phones ?? []}
-              sources={overview?.sources ?? []}
+              phones={
+                activeSide === "new"
+                  ? (overview?.new_phones ?? [])
+                  : activeSide === "buy"
+                    ? (overview?.buy_phones ?? [])
+                    : (overview?.sell_phones ?? [])
+              }
+              sources={
+                activeSide === "new"
+                  ? (overview?.new_sources ?? [])
+                  : activeSide === "buy"
+                    ? (overview?.buy_sources ?? [])
+                    : (overview?.sell_sources ?? [])
+              }
               selectedPhone={selectedPhone}
               selectedSource={selectedSource}
               selectedCondition={selectedCondition}
               searchQuery={searchQuery}
               scraping={scraping}
               scrapeFeedback={scrapeFeedback}
+              onSideChange={handleSideChange}
               onPhoneChange={setSelectedPhone}
               onSourceChange={setSelectedSource}
               onConditionChange={setSelectedCondition}

@@ -14,8 +14,10 @@ type NormalizedCondition =
   | "unknown";
 
 type ExportGranularity = "daily" | "weekly" | "monthly";
+type MarketSide = "buy" | "sell" | "new";
 
 interface NormalizedPriceRecord {
+  side: MarketSide;
   source: string;
   source_product_id: string;
   brand: string;
@@ -33,6 +35,56 @@ interface NormalizedPriceRecord {
   captured_at: string;
   run_id: number;
   raw_payload: Record<string, unknown>;
+}
+
+function classifyMarketSide(source: string, isRenewed?: unknown): MarketSide {
+  if (source === "amazon.in" || source === "flipkart") return "new";
+  if (source === "Amazon India" && isRenewed === false) return "new";
+  if (source === "cashify_buy" || source === "Amazon India") return "buy";
+  return "sell";
+}
+
+function sanitizeMrp(rawMrp: number | null, price: number): number | null {
+  if (rawMrp === null || !Number.isFinite(rawMrp) || rawMrp <= 0) return null;
+  let mrp = rawMrp;
+  const s = String(Math.round(mrp));
+  if (s.length >= 8 && s.length % 2 === 0 && s.slice(0, s.length / 2) === s.slice(s.length / 2)) {
+    mrp = Number(s.slice(0, s.length / 2));
+  }
+  if (mrp < price || mrp > price * 5) return null;
+  return mrp;
+}
+
+const KNOWN_PHONE_BRANDS = [
+  "Apple",
+  "Samsung",
+  "OnePlus",
+  "Google",
+  "Xiaomi",
+  "Redmi",
+  "Realme",
+  "Vivo",
+  "Oppo",
+  "Motorola",
+  "Nothing",
+  "iQOO",
+  "Poco",
+  "Lava",
+];
+
+function deriveBrandFromTitle(title: string): string {
+  const lower = title.toLowerCase();
+  for (const b of KNOWN_PHONE_BRANDS) {
+    if (lower.includes(b.toLowerCase())) return b;
+  }
+  if (lower.includes("iphone")) return "Apple";
+  if (lower.includes("galaxy")) return "Samsung";
+  if (lower.includes("pixel")) return "Google";
+  return "Unknown";
+}
+
+function isRefurbishedOrUsedTitle(title: string): boolean {
+  return /\b(renewed|refurbished|pre[- ]?owned|used|second[- ]?hand)\b/i.test(title);
 }
 
 interface ScrapeRun {
@@ -235,6 +287,7 @@ function parseAmazonFixture(html: string, runId: number, capturedAt: string): No
       const storageGb = parseStorageGb(attrs.match(/data-storage="([^"]+)"/i)?.[1]) ?? defaultStorage;
       const condition = normalizeCondition(condRaw);
       records.push({
+        side: "sell",
         source: "amazon_sell",
         source_product_id: asin || stableProductId("amazon_sell", brand, model, storageGb),
         brand,
@@ -291,6 +344,7 @@ function parseCashifySellFixture(html: string, runId: number, capturedAt: string
       const price = Number(q.price ?? 0);
       if (!Number.isFinite(price) || price <= 0) continue;
       out.push({
+        side: "sell",
         source: "cashify_sell",
         source_product_id: String(q.id ?? v.id ?? stableProductId("cashify_sell", brand, model, storageGb)),
         brand,
@@ -342,6 +396,7 @@ function parseCashifyBuyFixture(html: string, runId: number, capturedAt: string)
     const storageGb = parseStorageGb(parts?.[2] ?? v.name);
     const avail = String(v.offers?.availability ?? "").toLowerCase();
     out.push({
+      side: "buy",
       source: "cashify_buy",
       source_product_id: String(v.sku ?? stableProductId("cashify_buy", brand, model, storageGb, v.color)),
       brand,
@@ -414,6 +469,7 @@ function parseGenericApiFixtures(runId: number, capturedAt: string): NormalizedP
           : String(inStockRaw ?? "").toLowerCase() === "true";
 
       out.push({
+        side: "sell",
         source: sourceName,
         source_product_id: String(getDotted(item, "sku_id") ?? stableProductId(sourceName, brand, model, storageGb)),
         brand,
@@ -435,6 +491,174 @@ function parseGenericApiFixtures(runId: number, capturedAt: string): NormalizedP
     }
   }
   return out;
+}
+
+function parseAmazonNewHtml(
+  html: string,
+  runId: number,
+  capturedAt: string,
+  fetchMode: "live" | "fixture_fallback" = "fixture_fallback",
+): NormalizedPriceRecord[] {
+  const out: NormalizedPriceRecord[] = [];
+  const itemRe = /<div[^>]*data-asin="([A-Z0-9]{10})"[^>]*>([\s\S]*?)(?=<div[^>]*data-asin="|<\/div>\s*<\/div>\s*<\/body>|$)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = itemRe.exec(html)) !== null) {
+    const asin = match[1];
+    const block = match[2];
+    const href = block.match(/href="([^"]*\/dp\/[^"]+)"/i)?.[1] ?? `/dp/${asin}`;
+    const titleRaw =
+      block.match(/<h2[^>]*>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i)?.[1] ??
+      block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] ??
+      "";
+    const title = titleRaw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!title || isRefurbishedOrUsedTitle(title)) continue;
+
+    const priceStr = block.match(/class="a-price-whole"[^>]*>([\d,]+)/i)?.[1] ?? "";
+    const price = Number(priceStr.replace(/,/g, ""));
+    if (!Number.isFinite(price) || price <= 0) continue;
+
+    const mrpStr =
+      block.match(/class="a-text-price"[\s\S]*?class="a-offscreen"[^>]*>([^<]+)/i)?.[1] ?? "";
+    const parsedMrp = Number(mrpStr.replace(/[^\d.]/g, ""));
+    const mrp = sanitizeMrp(Number.isFinite(parsedMrp) && parsedMrp > 0 ? parsedMrp : null, price);
+
+    const brand = deriveBrandFromTitle(title);
+    const model = cleanModelName(title, brand);
+    const storageGb = parseStorageGb(title);
+    const ramGb = parseRamGb(title);
+    const sourceUrl = href.startsWith("http") ? href : `https://www.amazon.in${href}`;
+
+    out.push({
+      side: "new",
+      source: "amazon.in",
+      source_product_id: asin,
+      brand,
+      model,
+      storage_gb: storageGb,
+      ram_gb: ramGb,
+      color: null,
+      condition: "new",
+      price,
+      currency: "INR",
+      mrp,
+      discount_pct: computeDiscountPct(price, mrp),
+      in_stock: true,
+      source_url: sourceUrl,
+      captured_at: capturedAt,
+      run_id: runId,
+      raw_payload: { asin, title, fetch_mode: fetchMode, marketplace: "amazon.in" },
+    });
+  }
+  return out;
+}
+
+function parseFlipkartNewHtml(
+  html: string,
+  runId: number,
+  capturedAt: string,
+  fetchMode: "live" | "fixture_fallback" = "fixture_fallback",
+): NormalizedPriceRecord[] {
+  const out: NormalizedPriceRecord[] = [];
+  const cardRe = /<div[^>]*data-id="([A-Z0-9]+)"[^>]*>([\s\S]*?)(?=<div[^>]*data-id="|<\/div>\s*<\/body>|$)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = cardRe.exec(html)) !== null) {
+    const fsn = match[1];
+    const block = match[2];
+    const href = block.match(/href="([^"]+)"/i)?.[1] ?? `/p/${fsn}`;
+    const titleRaw =
+      block.match(/class="KzDlHZ"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ??
+      block.match(/class="_4rR01T"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ??
+      "";
+    const title = titleRaw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!title || isRefurbishedOrUsedTitle(title)) continue;
+
+    const priceStr =
+      block.match(/class="Nx9bqj[^"]*"[^>]*>([^<]+)/i)?.[1] ??
+      block.match(/class="_30jeq3[^"]*"[^>]*>([^<]+)/i)?.[1] ??
+      "";
+    const price = Number(priceStr.replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(price) || price <= 0) continue;
+
+    const mrpStr =
+      block.match(/class="yRaY8j[^"]*"[^>]*>([^<]+)/i)?.[1] ??
+      block.match(/class="_3I9_wc[^"]*"[^>]*>([^<]+)/i)?.[1] ??
+      "";
+    const parsedMrp = Number(mrpStr.replace(/[^\d.]/g, ""));
+    const mrp = sanitizeMrp(Number.isFinite(parsedMrp) && parsedMrp > 0 ? parsedMrp : null, price);
+
+    const brand = deriveBrandFromTitle(title);
+    const model = cleanModelName(title, brand);
+    const storageGb = parseStorageGb(title);
+    const ramGb = parseRamGb(title);
+    const sourceUrl = href.startsWith("http") ? href : `https://www.flipkart.com${href}`;
+
+    out.push({
+      side: "new",
+      source: "flipkart",
+      source_product_id: fsn,
+      brand,
+      model,
+      storage_gb: storageGb,
+      ram_gb: ramGb,
+      color: null,
+      condition: "new",
+      price,
+      currency: "INR",
+      mrp,
+      discount_pct: computeDiscountPct(price, mrp),
+      in_stock: true,
+      source_url: sourceUrl,
+      captured_at: capturedAt,
+      run_id: runId,
+      raw_payload: { fsn, title, fetch_mode: fetchMode, marketplace: "flipkart" },
+    });
+  }
+  return out;
+}
+
+async function scrapeNewDevicesSource(
+  source: "amazon.in" | "flipkart",
+  phoneQuery: string,
+  runId: number,
+  capturedAt: string,
+): Promise<NormalizedPriceRecord[]> {
+  const q = phoneQuery !== "all" ? phoneQuery : "5g smartphone";
+  const targetUrl =
+    source === "amazon.in"
+      ? `https://www.amazon.in/s?k=${encodeURIComponent(q)}`
+      : `https://www.flipkart.com/search?q=${encodeURIComponent(q)}`;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "en-IN,en;q=0.9",
+      },
+    });
+    clearTimeout(timer);
+    if (resp.ok) {
+      const html = await resp.text();
+      const parsed =
+        source === "amazon.in"
+          ? parseAmazonNewHtml(html, runId, capturedAt, "live")
+          : parseFlipkartNewHtml(html, runId, capturedAt, "live");
+      if (parsed.length > 0) return parsed;
+    }
+  } catch {
+    // Fallback to saved marketplace HTML fixture when live host blocks or is offline
+  }
+
+  const fixtureFile = source === "amazon.in" ? "amazon_new.html" : "flipkart_new.html";
+  const fp = path.join(FIXTURES_DIR, fixtureFile);
+  if (!fs.existsSync(fp)) return [];
+  const html = fs.readFileSync(fp, "utf-8");
+  return source === "amazon.in"
+    ? parseAmazonNewHtml(html, runId, capturedAt, "fixture_fallback")
+    : parseFlipkartNewHtml(html, runId, capturedAt, "fixture_fallback");
 }
 
 function loadInitialWorkspaceData(): {
@@ -474,21 +698,26 @@ function loadInitialWorkspaceData(): {
           r.scraped_at ?? r.timestamp,
           "2026-11-13T13:36:43.809Z",
         );
-        const mrpVal = r.original_mrp !== null && r.original_mrp !== undefined ? Number(r.original_mrp) : null;
+        const rawMrpVal = r.original_mrp !== null && r.original_mrp !== undefined ? Number(r.original_mrp) : null;
+        const mrpVal = sanitizeMrp(rawMrpVal, price);
+        const rawSrcName = String(r.source_name ?? "cashify_sell");
+        const side = classifyMarketSide(rawSrcName, r.is_renewed);
+        const srcName = rawSrcName === "Amazon India" && side === "new" ? "amazon.in" : rawSrcName;
         upsert({
-          source: String(r.source_name ?? "cashify_sell"),
-          source_product_id: String(r.device_id ?? stableProductId("cashify_sell", brand, model, storageGb)),
+          side,
+          source: srcName,
+          source_product_id: String(r.asin ?? r.device_id ?? stableProductId(srcName, brand, model, storageGb)),
           brand,
           model,
           storage_gb: storageGb,
           ram_gb: ramGb,
           color: r.color ? String(r.color) : null,
-          condition: cond,
+          condition: side === "new" ? "new" : cond,
           price,
           currency: String(r.currency ?? "INR"),
-          mrp: mrpVal && Number.isFinite(mrpVal) ? mrpVal : null,
+          mrp: mrpVal,
           discount_pct: computeDiscountPct(price, mrpVal),
-          in_stock: null,
+          in_stock: side === "new" ? true : null,
           source_url: String(r.source_url ?? "https://www.cashify.in"),
           captured_at: capturedAt,
           run_id: 1,
@@ -514,6 +743,7 @@ function loadInitialWorkspaceData(): {
       const cond = normalizeCondition(r.condition);
       const scrapedAt = ensureIsoTimestamp(r.scraped_at, "2026-11-02T14:14:55.000Z");
       upsert({
+        side: "sell",
         source: "cashify_sell",
         source_product_id: r.id ? `cb-${r.id}` : stableProductId("cashify_sell", brand, model, storageGb),
         brand,
@@ -546,10 +776,11 @@ function loadInitialWorkspaceData(): {
       const model = cleanModelName(r.model || "Unknown", brand);
       const storageGb = parseStorageGb(r.storage);
       const ramGb = parseRamGb(r.ram);
-      const mrp = r.original_mrp ? Number(r.original_mrp) : null;
+      const mrp = sanitizeMrp(r.original_mrp ? Number(r.original_mrp) : null, price);
       const disc = r.discount_percent ? Number(r.discount_percent) : computeDiscountPct(price, mrp);
       const avail = (r.availability || "").toLowerCase();
       upsert({
+        side: "buy",
         source: "cashify_buy",
         source_product_id: r.sku || stableProductId("cashify_buy", brand, model, storageGb, r.color),
         brand,
@@ -560,7 +791,7 @@ function loadInitialWorkspaceData(): {
         condition: normalizeCondition(r.refurbished_grade || r.device_condition),
         price,
         currency: r.currency || "INR",
-        mrp: mrp && Number.isFinite(mrp) ? mrp : null,
+        mrp,
         discount_pct: disc && Number.isFinite(disc) ? disc : null,
         in_stock: avail ? avail === "instock" : null,
         source_url: r.source_url || "https://www.cashify.in/buy-refurbished-mobile-phones",
@@ -571,7 +802,7 @@ function loadInitialWorkspaceData(): {
     }
   }
 
-  // 4. Load fixture datasets for amazon_sell, cashify_sell, cashify_buy, and example_api
+  // 4. Load fixture datasets for amazon_sell, cashify_sell, cashify_buy, example_api, amazon.in, and flipkart
   const fixtureTs = "2026-11-17T06:00:00+00:00";
   const amazonPath = path.join(FIXTURES_DIR, "amazon_sell.html");
   if (fs.existsSync(amazonPath)) {
@@ -593,6 +824,18 @@ function loadInitialWorkspaceData(): {
   }
   for (const rec of parseGenericApiFixtures(7, fixtureTs)) {
     upsert(rec);
+  }
+  const amazonNewPath = path.join(FIXTURES_DIR, "amazon_new.html");
+  if (fs.existsSync(amazonNewPath)) {
+    for (const rec of parseAmazonNewHtml(fs.readFileSync(amazonNewPath, "utf-8"), 8, fixtureTs)) {
+      upsert(rec);
+    }
+  }
+  const flipkartNewPath = path.join(FIXTURES_DIR, "flipkart_new.html");
+  if (fs.existsSync(flipkartNewPath)) {
+    for (const rec of parseFlipkartNewHtml(fs.readFileSync(flipkartNewPath, "utf-8"), 9, fixtureTs)) {
+      upsert(rec);
+    }
   }
 
   // 5. Read YAML source configs from phone-price-scraper/config/
@@ -905,7 +1148,23 @@ async function startServer(): Promise<void> {
     const phones = Array.from(
       new Set(state.records.map((r) => `${r.brand} ${r.model}`.trim())),
     ).sort((a, b) => a.localeCompare(b));
+    const buyRecords = state.records.filter((r) => r.side === "buy");
+    const sellRecords = state.records.filter((r) => r.side === "sell");
+    const newRecords = state.records.filter((r) => r.side === "new");
+    const buyPhones = Array.from(
+      new Set(buyRecords.map((r) => `${r.brand} ${r.model}`.trim())),
+    ).sort((a, b) => a.localeCompare(b));
+    const sellPhones = Array.from(
+      new Set(sellRecords.map((r) => `${r.brand} ${r.model}`.trim())),
+    ).sort((a, b) => a.localeCompare(b));
+    const newPhones = Array.from(
+      new Set(newRecords.map((r) => `${r.brand} ${r.model}`.trim())),
+    ).sort((a, b) => a.localeCompare(b));
+
     const sources = Array.from(new Set(state.records.map((r) => r.source))).sort();
+    const buySources = Array.from(new Set(buyRecords.map((r) => r.source))).sort();
+    const sellSources = Array.from(new Set(sellRecords.map((r) => r.source))).sort();
+    const newSources = ["amazon.in", "flipkart"];
     const latest = state.records
       .map((r) => r.captured_at)
       .sort()
@@ -920,19 +1179,29 @@ async function startServer(): Promise<void> {
     res.json({
       kpis: {
         total_snapshots: state.records.length,
+        buy_snapshots: buyRecords.length,
+        sell_snapshots: sellRecords.length,
+        new_snapshots: newRecords.length,
         unique_models: phones.length,
         sources_count: sources.length,
         latest_captured_at: latest,
         avg_price: avgPrice,
       },
       phones,
+      buy_phones: buyPhones,
+      sell_phones: sellPhones,
+      new_phones: newPhones,
       sources,
+      buy_sources: buySources,
+      sell_sources: sellSources,
+      new_sources: newSources,
       source_configs: state.sourceConfigs,
       recent_runs: state.runs.slice(0, 12),
     });
   });
 
   app.get("/api/snapshots", (req, res) => {
+    const side = String(req.query.side ?? "all");
     const source = String(req.query.source ?? "all");
     const phone = String(req.query.phone ?? "all");
     const condition = String(req.query.condition ?? "all");
@@ -941,6 +1210,9 @@ async function startServer(): Promise<void> {
     const offset = Math.max(0, Number(req.query.offset ?? 0));
 
     let filtered = state.records;
+    if (side === "buy" || side === "sell" || side === "new") {
+      filtered = filtered.filter((r) => r.side === side);
+    }
     if (source !== "all") filtered = filtered.filter((r) => r.source === source);
     if (phone !== "all") {
       filtered = filtered.filter((r) => `${r.brand} ${r.model}`.trim() === phone);
@@ -965,15 +1237,76 @@ async function startServer(): Promise<void> {
     });
   });
 
-  app.post("/api/scrape", (req, res) => {
+  app.post("/api/scrape", async (req, res) => {
+    const requestedSide = String(req.body?.side ?? "all");
     const requestedSource = String(req.body?.source ?? "all");
     const requestedPhone = String(req.body?.phone ?? "all");
     const nowIso = new Date().toISOString();
     const runId = nextRunId++;
 
+    // New Devices tab ONLY scrapes brand-new devices from amazon.in and flipkart
+    if (requestedSide === "new") {
+      const allowedNewSources: Array<"amazon.in" | "flipkart"> =
+        requestedSource === "amazon.in" || requestedSource === "flipkart"
+          ? [requestedSource]
+          : ["amazon.in", "flipkart"];
+
+      const collectedNew: NormalizedPriceRecord[] = [];
+      for (const src of allowedNewSources) {
+        const items = await scrapeNewDevicesSource(src, requestedPhone, runId, nowIso);
+        collectedNew.push(...items);
+      }
+
+      const filteredNew =
+        requestedPhone === "all"
+          ? collectedNew
+          : collectedNew.filter(
+              (r) =>
+                `${r.brand} ${r.model}`.toLowerCase().includes(requestedPhone.toLowerCase()) ||
+                r.model.toLowerCase().includes(requestedPhone.toLowerCase()),
+            );
+
+      const todayUtc = nowIso.slice(0, 10);
+      for (const rec of filteredNew) {
+        const idx = state.records.findIndex(
+          (existing) =>
+            existing.source === rec.source &&
+            existing.source_product_id === rec.source_product_id &&
+            existing.condition === rec.condition &&
+            (existing.storage_gb ?? -1) === (rec.storage_gb ?? -1) &&
+            existing.captured_at.slice(0, 10) === todayUtc,
+        );
+        if (idx >= 0) {
+          state.records[idx] = rec;
+        } else {
+          state.records.unshift(rec);
+        }
+      }
+
+      const runRecord: ScrapeRun = {
+        id: runId,
+        source: allowedNewSources.join(","),
+        started_at: nowIso,
+        finished_at: new Date().toISOString(),
+        status: "success",
+        records_count: filteredNew.length,
+        error_message: null,
+      };
+      state.runs.unshift(runRecord);
+      res.json({ run: runRecord, collected_count: filteredNew.length, records: filteredNew });
+      return;
+    }
+
+    const defaultSourcesForSide =
+      requestedSide === "buy"
+        ? ["cashify_buy"]
+        : requestedSide === "sell"
+          ? ["cashify_sell", "amazon_sell", "example_api"]
+          : ["cashify_sell", "cashify_buy", "amazon_sell", "example_api"];
+
     const runSources =
       requestedSource === "all"
-        ? ["cashify_sell", "cashify_buy", "amazon_sell", "example_api"]
+        ? defaultSourcesForSide
         : [requestedSource.replace(/^api:/, "")];
 
     const collected: NormalizedPriceRecord[] = [];

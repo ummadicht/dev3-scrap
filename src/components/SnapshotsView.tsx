@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { Download, Play, Search, X } from "lucide-react";
-import type { NormalizedPriceRecord } from "../types";
+import type { MarketSide, NormalizedPriceRecord } from "../types";
 
 interface SnapshotsViewProps {
+  activeSide: MarketSide;
+  buyCount: number;
+  sellCount: number;
+  newCount: number;
   records: NormalizedPriceRecord[];
   total: number;
   loading: boolean;
@@ -14,6 +18,7 @@ interface SnapshotsViewProps {
   searchQuery: string;
   scraping: boolean;
   scrapeFeedback: string | null;
+  onSideChange: (side: MarketSide) => void;
   onPhoneChange: (val: string) => void;
   onSourceChange: (val: string) => void;
   onConditionChange: (val: string) => void;
@@ -31,6 +36,10 @@ function formatCurrency(value: number | null, currency: string): string {
 }
 
 export function SnapshotsView({
+  activeSide,
+  buyCount,
+  sellCount,
+  newCount,
   records,
   total,
   loading,
@@ -42,6 +51,7 @@ export function SnapshotsView({
   searchQuery,
   scraping,
   scrapeFeedback,
+  onSideChange,
   onPhoneChange,
   onSourceChange,
   onConditionChange,
@@ -51,12 +61,84 @@ export function SnapshotsView({
 }: SnapshotsViewProps) {
   const [inspectRecord, setInspectRecord] = useState<NormalizedPriceRecord | null>(null);
 
+  const isBuy = activeSide === "buy";
+  const isNew = activeSide === "new";
+  const showRetailColumns = isBuy || isNew;
+
+  const tabDescription = isNew
+    ? "Brand-new retail devices scraped exclusively from amazon.in and flipkart"
+    : isBuy
+      ? "Refurbished & renewed listing prices with MRP, discount %, and stock status"
+      : "Trade-in & buyback quotes across condition grades and partner API feeds";
+
+  const sideLabel = isNew ? "New Devices" : isBuy ? "Buy" : "Sell";
+
   return (
     <div className="space-y-6">
+      {/* Separate Buy / Sell / New Devices Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
+        <div
+          role="tablist"
+          aria-label="Market side"
+          className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isBuy}
+            onClick={() => onSideChange("buy")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+              isBuy
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Buy · Refurbished{" "}
+            <span className="ml-1 font-mono text-xs text-slate-500 tabular-nums">
+              ({buyCount})
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSide === "sell"}
+            onClick={() => onSideChange("sell")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+              activeSide === "sell"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Sell · Buyback{" "}
+            <span className="ml-1 font-mono text-xs text-slate-500 tabular-nums">
+              ({sellCount})
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isNew}
+            onClick={() => onSideChange("new")}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+              isNew
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            New Devices · Amazon.in &amp; Flipkart{" "}
+            <span className="ml-1 font-mono text-xs text-slate-500 tabular-nums">
+              ({newCount})
+            </span>
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-500">{tabDescription}</p>
+      </div>
+
       {/* Filter & Scraper Control Bar */}
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:items-end">
-          <div className="md:col-span-3">
+          <div className={isNew ? "md:col-span-4" : "md:col-span-3"}>
             <label htmlFor="phone-select" className="mb-1.5 block text-xs font-medium text-slate-600">
               Available Phones
             </label>
@@ -66,7 +148,7 @@ export function SnapshotsView({
               onChange={(e) => onPhoneChange(e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
             >
-              <option value="all">All Available Phones ({phones.length})</option>
+              <option value="all">All {sideLabel} Phones ({phones.length})</option>
               {phones.map((phone) => (
                 <option key={phone} value={phone}>
                   {phone}
@@ -75,7 +157,7 @@ export function SnapshotsView({
             </select>
           </div>
 
-          <div className="md:col-span-2">
+          <div className={isNew ? "md:col-span-3" : "md:col-span-2"}>
             <label htmlFor="source-select" className="mb-1.5 block text-xs font-medium text-slate-600">
               Source
             </label>
@@ -85,7 +167,9 @@ export function SnapshotsView({
               onChange={(e) => onSourceChange(e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
             >
-              <option value="all">All Sources</option>
+              <option value="all">
+                {isNew ? "Amazon.in & Flipkart" : `All ${sideLabel} Sources`}
+              </option>
               {sources.map((src) => (
                 <option key={src} value={src}>
                   {src}
@@ -94,23 +178,25 @@ export function SnapshotsView({
             </select>
           </div>
 
-          <div className="md:col-span-2">
-            <label htmlFor="condition-select" className="mb-1.5 block text-xs font-medium text-slate-600">
-              Condition
-            </label>
-            <select
-              id="condition-select"
-              value={selectedCondition}
-              onChange={(e) => onConditionChange(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c === "all" ? "All Conditions" : c.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!isNew && (
+            <div className="md:col-span-2">
+              <label htmlFor="condition-select" className="mb-1.5 block text-xs font-medium text-slate-600">
+                Condition
+              </label>
+              <select
+                id="condition-select"
+                value={selectedCondition}
+                onChange={(e) => onConditionChange(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-teal-700 focus:outline-none"
+              >
+                {CONDITIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "all" ? "All Conditions" : c.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <label htmlFor="snapshot-search" className="mb-1.5 block text-xs font-medium text-slate-600">
@@ -137,7 +223,7 @@ export function SnapshotsView({
               className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-800 disabled:opacity-50 whitespace-nowrap shrink-0"
             >
               <Play className="h-3.5 w-3.5" />
-              {scraping ? "Collecting..." : "Scrape Selection"}
+              {scraping ? "Collecting..." : `Scrape ${sideLabel}`}
             </button>
             <button
               type="button"
@@ -159,9 +245,15 @@ export function SnapshotsView({
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Normalized Price Snapshots</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              {isNew
+                ? "New Devices (Amazon.in & Flipkart)"
+                : isBuy
+                  ? "Buy Listings (Refurbished & Renewed)"
+                  : "Sell Quotes (Buyback & Trade-In)"}
+            </h2>
             <p className="text-xs text-slate-500">
-              Showing {records.length} of {total} deduplicated records · Click any row to inspect raw payload
+              Showing {records.length} of {total} snapshots · Click any row to inspect raw payload
             </p>
           </div>
         </div>
@@ -174,9 +266,11 @@ export function SnapshotsView({
                 <th className="px-4 py-2.5">Source</th>
                 <th className="px-4 py-2.5">Specs</th>
                 <th className="px-4 py-2.5">Condition</th>
-                <th className="px-4 py-2.5 text-right">Price</th>
-                <th className="px-4 py-2.5 text-right">MRP / Disc</th>
-                <th className="px-4 py-2.5">Stock</th>
+                <th className="px-4 py-2.5 text-right">
+                  {showRetailColumns ? "Selling Price" : "Buyback Offer"}
+                </th>
+                {showRetailColumns && <th className="px-4 py-2.5 text-right">MRP / Disc</th>}
+                {showRetailColumns && <th className="px-4 py-2.5">Availability</th>}
                 <th className="px-4 py-2.5 text-right">Captured (UTC)</th>
               </tr>
             </thead>
@@ -184,15 +278,15 @@ export function SnapshotsView({
               {loading ? (
                 Array.from({ length: 6 }).map((_, idx) => (
                   <tr key={idx}>
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={showRetailColumns ? 8 : 6} className="px-4 py-3">
                       <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
                     </td>
                   </tr>
                 ))
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
-                    No matching price snapshots found. Try clearing filters or running a collection pass.
+                  <td colSpan={showRetailColumns ? 8 : 6} className="px-4 py-10 text-center text-sm text-slate-500">
+                    No matching {sideLabel.toLowerCase()} snapshots found. Try clearing filters or running a collection pass.
                   </td>
                 </tr>
               ) : (
@@ -224,25 +318,29 @@ export function SnapshotsView({
                     <td className="px-4 py-2.5 text-right font-mono font-medium text-slate-900 tabular-nums">
                       {formatCurrency(rec.price, rec.currency)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600 tabular-nums">
-                      {rec.mrp ? (
-                        <span>
-                          {formatCurrency(rec.mrp, rec.currency)}
-                          {rec.discount_pct !== null ? ` (-${rec.discount_pct}%)` : ""}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-600">
-                      {rec.in_stock === true ? (
-                        <span className="text-emerald-700">In stock</span>
-                      ) : rec.in_stock === false ? (
-                        <span className="text-rose-700">Out of stock</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+                    {showRetailColumns && (
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600 tabular-nums">
+                        {rec.mrp ? (
+                          <span>
+                            {formatCurrency(rec.mrp, rec.currency)}
+                            {rec.discount_pct !== null ? ` (-${rec.discount_pct}%)` : ""}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
+                    {showRetailColumns && (
+                      <td className="px-4 py-2.5 text-xs text-slate-600">
+                        {rec.in_stock === true ? (
+                          <span className="text-emerald-700">In stock</span>
+                        ) : rec.in_stock === false ? (
+                          <span className="text-rose-700">Out of stock</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500 tabular-nums">
                       {rec.captured_at.slice(0, 16).replace("T", " ")}
                     </td>
@@ -264,7 +362,7 @@ export function SnapshotsView({
                   {inspectRecord.brand} {inspectRecord.model}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {inspectRecord.source} · {inspectRecord.condition} · Run #{inspectRecord.run_id}
+                  {inspectRecord.side.toUpperCase()} · {inspectRecord.source} · {inspectRecord.condition} · Run #{inspectRecord.run_id}
                 </p>
               </div>
               <button
@@ -281,7 +379,7 @@ export function SnapshotsView({
                 Source URL:{" "}
                 <span className="font-mono break-all text-slate-800">{inspectRecord.source_url}</span>
               </div>
-              <div className="text-xs font-medium text-slate-700 mb-2">Raw Payload JSONB</div>
+              <div className="mb-2 text-xs font-medium text-slate-700">Raw Payload JSONB</div>
               <pre className="overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-4 font-mono text-xs text-slate-800">
                 {JSON.stringify(inspectRecord.raw_payload, null, 2)}
               </pre>

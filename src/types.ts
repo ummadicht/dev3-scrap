@@ -8,8 +8,10 @@ export type NormalizedCondition =
   | "unknown";
 
 export type ExportGranularity = "daily" | "weekly" | "monthly";
+export type MarketSide = "buy" | "sell" | "new";
 
 export interface NormalizedPriceRecord {
+  side: MarketSide;
   source: string;
   source_product_id: string;
   brand: string;
@@ -51,13 +53,22 @@ export interface SourceConfigSummary {
 export interface OverviewResponse {
   kpis: {
     total_snapshots: number;
+    buy_snapshots: number;
+    sell_snapshots: number;
+    new_snapshots: number;
     unique_models: number;
     sources_count: number;
     latest_captured_at: string | null;
     avg_price: number;
   };
   phones: string[];
+  buy_phones: string[];
+  sell_phones: string[];
+  new_phones: string[];
   sources: string[];
+  buy_sources: string[];
+  sell_sources: string[];
+  new_sources: string[];
   source_configs: SourceConfigSummary[];
   recent_runs: ScrapeRun[];
 }
