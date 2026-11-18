@@ -102,11 +102,26 @@ interface ScrapeRun {
 
 interface SourceConfigSummary {
   name: string;
+  raw_name?: string;
   kind: "playwright" | "generic_api";
+  side?: MarketSide;
   enabled: boolean;
   urls: string[];
+  method?: "GET" | "POST";
   auth_type?: string;
+  auth_token_env?: string;
+  auth_header_name?: string;
   pagination_type?: string;
+  pagination_param?: string;
+  pagination_path?: string;
+  max_pages?: number;
+  items_path?: string;
+  params?: Record<string, string>;
+  headers?: Record<string, string>;
+  field_map?: Record<string, string>;
+  timeout_sec?: number;
+  rate_limit_min_sec?: number;
+  rate_limit_max_sec?: number;
 }
 
 interface TrendRow {
@@ -435,17 +450,269 @@ function getDotted(obj: unknown, dottedPath: string): unknown {
   return curr;
 }
 
-function parseGenericApiFixtures(runId: number, capturedAt: string): NormalizedPriceRecord[] {
-  const yamlPath = path.join(SCRAPER_DIR, "config", "sources", "example_api.yaml");
-  if (!fs.existsSync(yamlPath)) return [];
-  const cfg = yaml.load(fs.readFileSync(yamlPath, "utf-8")) as {
+const DEFAULT_API_FIELD_MAP: Record<string, { path: string; transforms: string[] }> = {
+  source_product_id: { path: "sku_id", transforms: ["strip"] },
+  brand: { path: "device.brand", transforms: ["strip"] },
+  model: { path: "device.model_name", transforms: ["strip"] },
+  storage_gb: { path: "specs.storage", transforms: ["parse_storage_gb"] },
+  ram_gb: { path: "specs.ram", transforms: ["parse_ram_gb"] },
+  color: { path: "specs.color", transforms: ["strip"] },
+  condition: { path: "grade", transforms: ["strip", "lower", "normalize_condition"] },
+  price: { path: "pricing.offer_price", transforms: ["to_float"] },
+  currency: { path: "pricing.currency", transforms: ["strip", "upper"] },
+  mrp: { path: "pricing.retail_mrp", transforms: ["to_float"] },
+  in_stock: { path: "availability.in_stock", transforms: ["to_bool"] },
+  source_url: { path: "listing_url", transforms: ["strip"] },
+};
+
+function inferDefaultSideForSource(rawName: string): MarketSide {
+  if (rawName === "cashify_buy") return "buy";
+  if (rawName === "samsung_parts" || rawName === "apple_parts") return "parts";
+  if (rawName === "amazon.in" || rawName === "flipkart") return "new";
+  return "sell";
+}
+
+function loadSourceConfigsFromDisk(): SourceConfigSummary[] {
+  const sourceConfigs: SourceConfigSummary[] = [];
+  const settingsYaml = path.join(SCRAPER_DIR, "config", "settings.yaml");
+  if (fs.existsSync(settingsYaml)) {
+    const parsed = yaml.load(fs.readFileSync(settingsYaml, "utf-8")) as {
+      sources?: Record<
+        string,
+        { enabled?: boolean; side?: MarketSide; urls?: string[]; timeout_sec?: number }
+      >;
+    };
+    for (const [name, cfg] of Object.entries(parsed?.sources ?? {})) {
+      sourceConfigs.push({
+        name,
+        raw_name: name,
+        kind: "playwright",
+        side: cfg.side ?? inferDefaultSideForSource(name),
+        enabled: cfg.enabled ?? true,
+        urls: cfg.urls ?? [],
+        timeout_sec: cfg.timeout_sec ?? 20,
+      });
+    }
+  }
+  const sourcesDir = path.join(SCRAPER_DIR, "config", "sources");
+  if (fs.existsSync(sourcesDir)) {
+    const files = fs.readdirSync(sourcesDir).sort();
+    for (const file of files) {
+      if (!file.endsWith(".yaml") && !file.endsWith(".yml")) continue;
+      const cfg = yaml.load(fs.readFileSync(path.join(sourcesDir, file), "utf-8")) as {
+        name?: string;
+        side?: MarketSide;
+        enabled?: boolean;
+        url?: string;
+        method?: "GET" | "POST";
+        params?: Record<string, unknown>;
+        headers?: Record<string, unknown>;
+        auth?: { type?: string; token_env?: string; header_name?: string };
+        pagination?: {
+          type?: string;
+          cursor_param?: string;
+          cursor_path?: string;
+          max_pages?: number;
+        };
+        response?: { items_path?: string };
+        field_map?: Record<string, { path?: string; transforms?: string[] } | string>;
+        rate_limit?: { min_delay_sec?: number; max_delay_sec?: number };
+        timeout?: number;
+      };
+      const rawName = String(cfg.name ?? path.basename(file, path.extname(file)));
+      const flatFieldMap: Record<string, string> = {};
+      for (const [k, v] of Object.entries(cfg.field_map ?? DEFAULT_API_FIELD_MAP)) {
+        if (typeof v === "string") {
+          flatFieldMap[k] = v;
+        } else if (v && typeof v === "object" && v.path) {
+          flatFieldMap[k] = String(v.path);
+        }
+      }
+      const cleanParams: Record<string, string> = {};
+      for (const [k, v] of Object.entries(cfg.params ?? {})) {
+        if (v !== undefined && v !== null) cleanParams[k] = String(v);
+      }
+      const cleanHeaders: Record<string, string> = {};
+      for (const [k, v] of Object.entries(cfg.headers ?? {})) {
+        if (v !== undefined && v !== null) cleanHeaders[k] = String(v);
+      }
+
+      sourceConfigs.push({
+        name: `api:${rawName}`,
+        raw_name: rawName,
+        kind: "generic_api",
+        side: cfg.side ?? "sell",
+        enabled: cfg.enabled ?? true,
+        urls: cfg.url ? [cfg.url] : [],
+        method: cfg.method === "POST" ? "POST" : "GET",
+        auth_type: cfg.auth?.type ?? "none",
+        auth_token_env: cfg.auth?.token_env ?? "",
+        auth_header_name: cfg.auth?.header_name ?? "",
+        pagination_type: cfg.pagination?.type ?? "none",
+        pagination_param: cfg.pagination?.cursor_param ?? "cursor",
+        pagination_path: cfg.pagination?.cursor_path ?? "pagination.next_cursor",
+        max_pages: cfg.pagination?.max_pages ?? 20,
+        items_path: cfg.response?.items_path ?? "data.products",
+        params: cleanParams,
+        headers: cleanHeaders,
+        field_map: flatFieldMap,
+        timeout_sec: cfg.timeout ?? 15,
+        rate_limit_min_sec: cfg.rate_limit?.min_delay_sec ?? 1.0,
+        rate_limit_max_sec: cfg.rate_limit?.max_delay_sec ?? 2.5,
+      });
+    }
+  }
+  return sourceConfigs;
+}
+
+function saveSourceConfigToDisk(input: SourceConfigSummary, originalName?: string): void {
+  const rawName = (input.raw_name ?? input.name.replace(/^api:/, ""))
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, "_");
+  if (!rawName) throw new Error("Source name is required");
+
+  if (input.kind === "playwright") {
+    const settingsYaml = path.join(SCRAPER_DIR, "config", "settings.yaml");
+    const parsed = (
+      fs.existsSync(settingsYaml)
+        ? (yaml.load(fs.readFileSync(settingsYaml, "utf-8")) as Record<string, unknown>)
+        : {}
+    ) as {
+      app?: Record<string, unknown>;
+      sources?: Record<string, Record<string, unknown>>;
+    };
+    if (!parsed.sources) parsed.sources = {};
+    const origRaw = originalName ? originalName.replace(/^api:/, "") : rawName;
+    if (originalName && origRaw !== rawName && origRaw in parsed.sources) {
+      delete parsed.sources[origRaw];
+    }
+    const existing = parsed.sources[rawName] ?? {};
+    parsed.sources[rawName] = {
+      ...existing,
+      enabled: Boolean(input.enabled),
+      use_playwright: true,
+      side: input.side ?? inferDefaultSideForSource(rawName),
+      urls: (input.urls ?? []).map((u) => u.trim()).filter(Boolean),
+    };
+    fs.writeFileSync(settingsYaml, yaml.dump(parsed, { lineWidth: 120 }), "utf-8");
+    return;
+  }
+
+  // generic_api source -> phone-price-scraper/config/sources/<rawName>.yaml
+  const sourcesDir = path.join(SCRAPER_DIR, "config", "sources");
+  fs.mkdirSync(sourcesDir, { recursive: true });
+  const origRaw = originalName ? originalName.replace(/^api:/, "") : rawName;
+  if (originalName && origRaw !== rawName) {
+    const oldFile = path.join(sourcesDir, `${origRaw}.yaml`);
+    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+  }
+
+  const targetFile = path.join(sourcesDir, `${rawName}.yaml`);
+  const existingCfg = fs.existsSync(targetFile)
+    ? ((yaml.load(fs.readFileSync(targetFile, "utf-8")) as Record<string, unknown>) ?? {})
+    : {};
+
+  const fieldMapYaml: Record<string, { path: string; transforms: string[] }> = {};
+  const inputMap = input.field_map ?? {};
+  for (const [fieldKey, defaultSpec] of Object.entries(DEFAULT_API_FIELD_MAP)) {
+    const customPath = inputMap[fieldKey]?.trim();
+    fieldMapYaml[fieldKey] = {
+      path: customPath || defaultSpec.path,
+      transforms: defaultSpec.transforms,
+    };
+  }
+
+  const doc: Record<string, unknown> = {
+    ...existingCfg,
+    name: rawName,
+    side: input.side ?? "sell",
+    enabled: Boolean(input.enabled),
+    url: (input.urls?.[0] ?? "").trim() || "https://api.partner-marketplace.example.com/v1/phones/buyback-quotes",
+    method: input.method === "POST" ? "POST" : "GET",
+    params: input.params && Object.keys(input.params).length > 0 ? input.params : { country: "IN", category: "smartphones" },
+    headers: input.headers && Object.keys(input.headers).length > 0 ? input.headers : { Accept: "application/json" },
+    auth: {
+      type: input.auth_type || "none",
+      ...(input.auth_token_env ? { token_env: input.auth_token_env.trim() } : {}),
+      ...(input.auth_header_name ? { header_name: input.auth_header_name.trim() } : {}),
+    },
+    pagination: {
+      type: input.pagination_type || "none",
+      cursor_param: input.pagination_param || "cursor",
+      cursor_path: input.pagination_path || "pagination.next_cursor",
+      max_pages: Number(input.max_pages ?? 20),
+    },
+    response: {
+      items_path: (input.items_path ?? "data.products").trim() || "data.products",
+    },
+    field_map: fieldMapYaml,
+    retry: existingCfg.retry ?? { max_attempts: 3, backoff_base_sec: 1.0 },
+    rate_limit: {
+      min_delay_sec: Number(input.rate_limit_min_sec ?? 1.0),
+      max_delay_sec: Number(input.rate_limit_max_sec ?? 2.5),
+    },
+    timeout: Number(input.timeout_sec ?? 15.0),
+  };
+
+  fs.writeFileSync(targetFile, yaml.dump(doc, { lineWidth: 120 }), "utf-8");
+}
+
+function deleteSourceConfigFromDisk(targetName: string): boolean {
+  const rawName = targetName.replace(/^api:/, "");
+  const sourcesDir = path.join(SCRAPER_DIR, "config", "sources");
+  for (const ext of [".yaml", ".yml"]) {
+    const candidate = path.join(sourcesDir, `${rawName}${ext}`);
+    if (fs.existsSync(candidate)) {
+      fs.unlinkSync(candidate);
+      return true;
+    }
+  }
+  const settingsYaml = path.join(SCRAPER_DIR, "config", "settings.yaml");
+  if (fs.existsSync(settingsYaml)) {
+    const parsed = yaml.load(fs.readFileSync(settingsYaml, "utf-8")) as {
+      sources?: Record<string, unknown>;
+    };
+    if (parsed?.sources && rawName in parsed.sources) {
+      delete parsed.sources[rawName];
+      fs.writeFileSync(settingsYaml, yaml.dump(parsed, { lineWidth: 120 }), "utf-8");
+      return true;
+    }
+  }
+  return false;
+}
+
+function parseGenericApiFixtures(
+  runId: number,
+  capturedAt: string,
+  customCfg?: SourceConfigSummary,
+): NormalizedPriceRecord[] {
+  const yamlPath = path.join(
+    SCRAPER_DIR,
+    "config",
+    "sources",
+    `${customCfg?.raw_name ?? "example_api"}.yaml`,
+  );
+  let cfg: {
     name?: string;
+    side?: MarketSide;
     url?: string;
     response?: { items_path?: string };
     field_map?: Record<string, { path?: string; transforms?: string[] } | string>;
+  } = {};
+  if (fs.existsSync(yamlPath)) {
+    cfg = (yaml.load(fs.readFileSync(yamlPath, "utf-8")) as typeof cfg) ?? {};
+  }
+  const sourceName = String(customCfg?.raw_name ?? cfg.name ?? "example_api");
+  const side: MarketSide = customCfg?.side ?? cfg.side ?? "sell";
+  const itemsPath = String(customCfg?.items_path ?? cfg.response?.items_path ?? "data.products");
+  const fMap = customCfg?.field_map ?? {};
+  const pathFor = (key: string, fallback: string): string => {
+    if (fMap[key]) return fMap[key];
+    const entry = cfg.field_map?.[key];
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object" && entry.path) return entry.path;
+    return fallback;
   };
-  const sourceName = String(cfg.name ?? "example_api");
-  const itemsPath = String(cfg.response?.items_path ?? "data.products");
   const out: NormalizedPriceRecord[] = [];
 
   for (const fileName of ["generic_api_page1.json", "generic_api_page2.json"]) {
@@ -457,36 +724,49 @@ function parseGenericApiFixtures(runId: number, capturedAt: string): NormalizedP
     for (const rawItem of items) {
       if (!rawItem || typeof rawItem !== "object") continue;
       const item = rawItem as Record<string, unknown>;
-      const brand = String(getDotted(item, "device.brand") ?? "Unknown").trim();
-      const model = cleanModelName(String(getDotted(item, "device.model_name") ?? "Unknown"), brand);
-      const price = Number(getDotted(item, "pricing.offer_price") ?? 0);
+      const brand = String(getDotted(item, pathFor("brand", "device.brand")) ?? "Unknown").trim();
+      const model = cleanModelName(
+        String(getDotted(item, pathFor("model", "device.model_name")) ?? "Unknown"),
+        brand,
+      );
+      const price = Number(getDotted(item, pathFor("price", "pricing.offer_price")) ?? 0);
       if (!Number.isFinite(price) || price <= 0) continue;
-      const mrpRaw = getDotted(item, "pricing.retail_mrp");
+      const mrpRaw = getDotted(item, pathFor("mrp", "pricing.retail_mrp"));
       const mrp = mrpRaw !== undefined && mrpRaw !== null ? Number(mrpRaw) : null;
-      const storageGb = parseStorageGb(getDotted(item, "specs.storage"));
-      const ramGb = parseRamGb(getDotted(item, "specs.ram"));
-      const inStockRaw = getDotted(item, "availability.in_stock");
+      const storageGb = parseStorageGb(getDotted(item, pathFor("storage_gb", "specs.storage")));
+      const ramGb = parseRamGb(getDotted(item, pathFor("ram_gb", "specs.ram")));
+      const inStockRaw = getDotted(item, pathFor("in_stock", "availability.in_stock"));
       const inStock =
         typeof inStockRaw === "boolean"
           ? inStockRaw
           : String(inStockRaw ?? "").toLowerCase() === "true";
 
       out.push({
-        side: "sell",
+        side,
         source: sourceName,
-        source_product_id: String(getDotted(item, "sku_id") ?? stableProductId(sourceName, brand, model, storageGb)),
+        source_product_id: String(
+          getDotted(item, pathFor("source_product_id", "sku_id")) ??
+            stableProductId(sourceName, brand, model, storageGb),
+        ),
         brand,
         model,
         storage_gb: storageGb,
         ram_gb: ramGb,
-        color: String(getDotted(item, "specs.color") ?? "").trim() || null,
-        condition: normalizeCondition(String(getDotted(item, "grade") ?? "")),
+        color: String(getDotted(item, pathFor("color", "specs.color")) ?? "").trim() || null,
+        condition: normalizeCondition(String(getDotted(item, pathFor("condition", "grade")) ?? "")),
         price,
-        currency: String(getDotted(item, "pricing.currency") ?? "INR").trim().toUpperCase(),
+        currency: String(getDotted(item, pathFor("currency", "pricing.currency")) ?? "INR")
+          .trim()
+          .toUpperCase(),
         mrp,
         discount_pct: computeDiscountPct(price, mrp),
         in_stock: inStock,
-        source_url: String(getDotted(item, "listing_url") ?? cfg.url ?? ""),
+        source_url: String(
+          getDotted(item, pathFor("source_url", "listing_url")) ??
+            customCfg?.urls?.[0] ??
+            cfg.url ??
+            "",
+        ),
         captured_at: capturedAt,
         run_id: runId,
         raw_payload: item,
@@ -1018,42 +1298,7 @@ function loadInitialWorkspaceData(): {
   }
 
   // 5. Read YAML source configs from phone-price-scraper/config/
-  const sourceConfigs: SourceConfigSummary[] = [];
-  const settingsYaml = path.join(SCRAPER_DIR, "config", "settings.yaml");
-  if (fs.existsSync(settingsYaml)) {
-    const parsed = yaml.load(fs.readFileSync(settingsYaml, "utf-8")) as {
-      sources?: Record<string, { enabled?: boolean; urls?: string[] }>;
-    };
-    for (const [name, cfg] of Object.entries(parsed?.sources ?? {})) {
-      sourceConfigs.push({
-        name,
-        kind: "playwright",
-        enabled: cfg.enabled ?? true,
-        urls: cfg.urls ?? [],
-      });
-    }
-  }
-  const sourcesDir = path.join(SCRAPER_DIR, "config", "sources");
-  if (fs.existsSync(sourcesDir)) {
-    for (const file of fs.readdirSync(sourcesDir)) {
-      if (!file.endsWith(".yaml") && !file.endsWith(".yml")) continue;
-      const cfg = yaml.load(fs.readFileSync(path.join(sourcesDir, file), "utf-8")) as {
-        name?: string;
-        enabled?: boolean;
-        url?: string;
-        auth?: { type?: string };
-        pagination?: { type?: string };
-      };
-      sourceConfigs.push({
-        name: `api:${cfg.name ?? path.basename(file, path.extname(file))}`,
-        kind: "generic_api",
-        enabled: cfg.enabled ?? true,
-        urls: cfg.url ? [cfg.url] : [],
-        auth_type: cfg.auth?.type ?? "none",
-        pagination_type: cfg.pagination?.type ?? "none",
-      });
-    }
-  }
+  const sourceConfigs = loadSourceConfigsFromDisk();
 
   const runs: ScrapeRun[] = [
     {
@@ -1362,11 +1607,29 @@ async function startServer(): Promise<void> {
       new Set(partsRecords.map((r) => `${r.brand} ${r.model}`.trim())),
     ).sort((a, b) => a.localeCompare(b));
 
-    const sources = Array.from(new Set(state.records.map((r) => r.source))).sort();
-    const buySources = Array.from(new Set(buyRecords.map((r) => r.source))).sort();
-    const sellSources = Array.from(new Set(sellRecords.map((r) => r.source))).sort();
-    const newSources = ["amazon.in", "flipkart"];
-    const partsSources = ["apple_parts", "samsung_parts"];
+    const configuredBySide = (side: MarketSide) =>
+      state.sourceConfigs
+        .filter((c) => (c.side ?? inferDefaultSideForSource(c.raw_name ?? c.name)) === side)
+        .map((c) => c.raw_name ?? c.name.replace(/^api:/, ""));
+
+    const sources = Array.from(
+      new Set([
+        ...state.records.map((r) => r.source),
+        ...state.sourceConfigs.map((c) => c.raw_name ?? c.name.replace(/^api:/, "")),
+      ]),
+    ).sort();
+    const buySources = Array.from(
+      new Set([...buyRecords.map((r) => r.source), ...configuredBySide("buy")]),
+    ).sort();
+    const sellSources = Array.from(
+      new Set([...sellRecords.map((r) => r.source), ...configuredBySide("sell")]),
+    ).sort();
+    const newSources = Array.from(
+      new Set(["amazon.in", "flipkart", ...configuredBySide("new")]),
+    ).sort();
+    const partsSources = Array.from(
+      new Set(["apple_parts", "samsung_parts", ...configuredBySide("parts")]),
+    ).sort();
     const partCategories = Array.from(
       new Set(partsRecords.map((r) => r.part_category).filter((v): v is string => Boolean(v))),
     ).sort((a, b) => a.localeCompare(b));
@@ -1380,6 +1643,7 @@ async function startServer(): Promise<void> {
             (state.records.reduce((acc, r) => acc + r.price, 0) / state.records.length) * 100,
           ) / 100
         : 0;
+    const activeSourcesCount = state.sourceConfigs.filter((c) => c.enabled).length;
 
     res.json({
       kpis: {
@@ -1389,7 +1653,7 @@ async function startServer(): Promise<void> {
         new_snapshots: newRecords.length,
         parts_snapshots: partsRecords.length,
         unique_models: phones.length,
-        sources_count: sources.length,
+        sources_count: activeSourcesCount || sources.length,
         latest_captured_at: latest,
         avg_price: avgPrice,
       },
@@ -1407,6 +1671,153 @@ async function startServer(): Promise<void> {
       source_configs: state.sourceConfigs,
       recent_runs: state.runs.slice(0, 12),
     });
+  });
+
+  app.get("/api/sources", (_req, res) => {
+    state.sourceConfigs = loadSourceConfigsFromDisk();
+    res.json({ sources: state.sourceConfigs });
+  });
+
+  app.post("/api/sources", (req, res) => {
+    try {
+      const body = req.body as Partial<SourceConfigSummary>;
+      const rawName = String(body.raw_name ?? body.name ?? "")
+        .replace(/^api:/, "")
+        .trim()
+        .replace(/[^a-zA-Z0-9_.-]/g, "_");
+      if (!rawName) {
+        res.status(400).json({ error: "Source name is required" });
+        return;
+      }
+      const kind = body.kind === "playwright" ? "playwright" : "generic_api";
+      const fullName = kind === "generic_api" ? `api:${rawName}` : rawName;
+      if (
+        state.sourceConfigs.some(
+          (s) => s.name.toLowerCase() === fullName.toLowerCase() || s.raw_name?.toLowerCase() === rawName.toLowerCase(),
+        )
+      ) {
+        res.status(409).json({ error: `Source '${rawName}' already exists` });
+        return;
+      }
+
+      const newCfg: SourceConfigSummary = {
+        name: fullName,
+        raw_name: rawName,
+        kind,
+        side: body.side ?? inferDefaultSideForSource(rawName),
+        enabled: body.enabled ?? true,
+        urls: Array.isArray(body.urls) ? body.urls.map(String).filter(Boolean) : [],
+        method: body.method === "POST" ? "POST" : "GET",
+        auth_type: body.auth_type ?? "none",
+        auth_token_env: body.auth_token_env ?? "",
+        auth_header_name: body.auth_header_name ?? "",
+        pagination_type: body.pagination_type ?? "none",
+        pagination_param: body.pagination_param ?? "cursor",
+        pagination_path: body.pagination_path ?? "pagination.next_cursor",
+        max_pages: Number(body.max_pages ?? 20),
+        items_path: body.items_path ?? "data.products",
+        params: body.params ?? { country: "IN", category: "smartphones" },
+        headers: body.headers ?? { Accept: "application/json" },
+        field_map: body.field_map ?? {},
+        timeout_sec: Number(body.timeout_sec ?? 15),
+        rate_limit_min_sec: Number(body.rate_limit_min_sec ?? 1.0),
+        rate_limit_max_sec: Number(body.rate_limit_max_sec ?? 2.5),
+      };
+
+      saveSourceConfigToDisk(newCfg);
+      state.sourceConfigs = loadSourceConfigsFromDisk();
+      const saved = state.sourceConfigs.find((s) => s.raw_name === rawName || s.name === fullName);
+      res.status(201).json({ source: saved ?? newCfg, sources: state.sourceConfigs });
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Failed to create source configuration",
+      });
+    }
+  });
+
+  app.put("/api/sources/:name", (req, res) => {
+    try {
+      const targetName = decodeURIComponent(req.params.name);
+      const existing = state.sourceConfigs.find(
+        (s) => s.name === targetName || s.raw_name === targetName.replace(/^api:/, ""),
+      );
+      if (!existing) {
+        res.status(404).json({ error: `Source '${targetName}' not found` });
+        return;
+      }
+
+      const body = req.body as Partial<SourceConfigSummary>;
+      const kind = body.kind ?? existing.kind;
+      const rawName = String(body.raw_name ?? body.name ?? existing.raw_name ?? existing.name)
+        .replace(/^api:/, "")
+        .trim()
+        .replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const fullName = kind === "generic_api" ? `api:${rawName}` : rawName;
+
+      const updatedCfg: SourceConfigSummary = {
+        ...existing,
+        ...body,
+        name: fullName,
+        raw_name: rawName,
+        kind,
+        side: body.side ?? existing.side ?? inferDefaultSideForSource(rawName),
+        enabled: body.enabled !== undefined ? Boolean(body.enabled) : existing.enabled,
+        urls: Array.isArray(body.urls) ? body.urls.map(String).filter(Boolean) : existing.urls,
+      };
+
+      saveSourceConfigToDisk(updatedCfg, existing.name);
+      state.sourceConfigs = loadSourceConfigsFromDisk();
+      const saved = state.sourceConfigs.find((s) => s.raw_name === rawName || s.name === fullName);
+      res.json({ source: saved ?? updatedCfg, sources: state.sourceConfigs });
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Failed to update source configuration",
+      });
+    }
+  });
+
+  app.patch("/api/sources/:name/toggle", (req, res) => {
+    try {
+      const targetName = decodeURIComponent(req.params.name);
+      const existing = state.sourceConfigs.find(
+        (s) => s.name === targetName || s.raw_name === targetName.replace(/^api:/, ""),
+      );
+      if (!existing) {
+        res.status(404).json({ error: `Source '${targetName}' not found` });
+        return;
+      }
+      const nextEnabled =
+        typeof req.body?.enabled === "boolean" ? req.body.enabled : !existing.enabled;
+      const updatedCfg: SourceConfigSummary = {
+        ...existing,
+        enabled: nextEnabled,
+      };
+      saveSourceConfigToDisk(updatedCfg, existing.name);
+      state.sourceConfigs = loadSourceConfigsFromDisk();
+      const saved = state.sourceConfigs.find((s) => s.name === existing.name);
+      res.json({ source: saved ?? updatedCfg, sources: state.sourceConfigs });
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Failed to toggle source status",
+      });
+    }
+  });
+
+  app.delete("/api/sources/:name", (req, res) => {
+    try {
+      const targetName = decodeURIComponent(req.params.name);
+      const removed = deleteSourceConfigFromDisk(targetName);
+      if (!removed) {
+        res.status(404).json({ error: `Source '${targetName}' not found` });
+        return;
+      }
+      state.sourceConfigs = loadSourceConfigsFromDisk();
+      res.json({ deleted: targetName, sources: state.sourceConfigs });
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : "Failed to delete source",
+      });
+    }
   });
 
   app.get("/api/snapshots", (req, res) => {
@@ -1570,17 +1981,43 @@ async function startServer(): Promise<void> {
       return;
     }
 
+    const enabledSourceSet = new Set(
+      state.sourceConfigs
+        .filter((c) => c.enabled)
+        .map((c) => c.raw_name ?? c.name.replace(/^api:/, "")),
+    );
+    const isSourceEnabled = (rawSrc: string): boolean => {
+      const known = state.sourceConfigs.find(
+        (c) => (c.raw_name ?? c.name.replace(/^api:/, "")) === rawSrc,
+      );
+      return known ? known.enabled : true;
+    };
+
+    const customApisForSide = state.sourceConfigs
+      .filter((c) => c.kind === "generic_api" && c.enabled && (requestedSide === "all" || c.side === requestedSide))
+      .map((c) => c.raw_name ?? c.name.replace(/^api:/, ""));
+
     const defaultSourcesForSide =
       requestedSide === "buy"
-        ? ["cashify_buy"]
+        ? Array.from(new Set(["cashify_buy", ...customApisForSide])).filter(isSourceEnabled)
         : requestedSide === "sell"
-          ? ["cashify_sell", "amazon_sell", "example_api"]
-          : ["cashify_sell", "cashify_buy", "amazon_sell", "example_api"];
+          ? Array.from(new Set(["cashify_sell", "amazon_sell", "example_api", ...customApisForSide])).filter(isSourceEnabled)
+          : Array.from(new Set(["cashify_sell", "cashify_buy", "amazon_sell", "example_api", ...customApisForSide])).filter(
+              isSourceEnabled,
+            );
+
+    const cleanReqSource = requestedSource.replace(/^api:/, "");
+    if (requestedSource !== "all" && !isSourceEnabled(cleanReqSource)) {
+      res.status(400).json({
+        error: `Source '${requestedSource}' is currently disabled. Enable it in Sources & Runs to collect data.`,
+      });
+      return;
+    }
 
     const runSources =
       requestedSource === "all"
         ? defaultSourcesForSide
-        : [requestedSource.replace(/^api:/, "")];
+        : [cleanReqSource];
 
     const collected: NormalizedPriceRecord[] = [];
     for (const src of runSources) {
@@ -1599,8 +2036,15 @@ async function startServer(): Promise<void> {
         if (fs.existsSync(fp)) {
           collected.push(...parseAmazonFixture(fs.readFileSync(fp, "utf-8"), runId, nowIso));
         }
-      } else if (src === "example_api") {
-        collected.push(...parseGenericApiFixtures(runId, nowIso));
+      } else {
+        const apiCfg = state.sourceConfigs.find(
+          (c) => c.raw_name === src || c.name === `api:${src}` || c.name === src,
+        );
+        if (apiCfg && apiCfg.kind === "generic_api") {
+          collected.push(...parseGenericApiFixtures(runId, nowIso, apiCfg));
+        } else if (src === "example_api" || enabledSourceSet.has(src)) {
+          collected.push(...parseGenericApiFixtures(runId, nowIso));
+        }
       }
     }
 

@@ -29,6 +29,7 @@ interface SnapshotsViewProps {
   onSearchChange: (val: string) => void;
   onRunScrape: () => void;
   onQuickExportCsv: () => void;
+  onManageSources?: () => void;
 }
 
 const CONDITIONS = ["all", "new", "like_new", "excellent", "good", "fair", "poor", "unknown"];
@@ -66,6 +67,7 @@ export function SnapshotsView({
   onSearchChange,
   onRunScrape,
   onQuickExportCsv,
+  onManageSources,
 }: SnapshotsViewProps) {
   const [inspectRecord, setInspectRecord] = useState<NormalizedPriceRecord | null>(null);
 
@@ -188,9 +190,20 @@ export function SnapshotsView({
           </div>
 
           <div className={isNew ? "md:col-span-3" : "md:col-span-2"}>
-            <label htmlFor="source-select" className="mb-1.5 block text-xs font-medium text-slate-600">
-              Source
-            </label>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <label htmlFor="source-select" className="block text-xs font-medium text-slate-600">
+                Source
+              </label>
+              {onManageSources && (
+                <button
+                  type="button"
+                  onClick={onManageSources}
+                  className="text-[11px] font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                >
+                  + Add / Edit API
+                </button>
+              )}
+            </div>
             <select
               id="source-select"
               value={selectedSource}

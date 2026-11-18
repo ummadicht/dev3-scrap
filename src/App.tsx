@@ -332,6 +332,7 @@ export default function App() {
               onSearchChange={setSearchQuery}
               onRunScrape={handleRunScrape}
               onQuickExportCsv={handleQuickExportCsv}
+              onManageSources={() => setActiveTab("sources")}
             />
           )}
 
@@ -356,6 +357,9 @@ export default function App() {
             <SourcesView
               sourceConfigs={overview?.source_configs ?? []}
               recentRuns={overview?.recent_runs ?? []}
+              onSourcesChanged={async () => {
+                await Promise.all([loadOverview(), loadSnapshots()]);
+              }}
             />
           )}
         </main>

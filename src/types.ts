@@ -45,11 +45,26 @@ export interface ScrapeRun {
 
 export interface SourceConfigSummary {
   name: string;
+  raw_name?: string;
   kind: "playwright" | "generic_api";
+  side?: MarketSide;
   enabled: boolean;
   urls: string[];
+  method?: "GET" | "POST";
   auth_type?: string;
+  auth_token_env?: string;
+  auth_header_name?: string;
   pagination_type?: string;
+  pagination_param?: string;
+  pagination_path?: string;
+  max_pages?: number;
+  items_path?: string;
+  params?: Record<string, string>;
+  headers?: Record<string, string>;
+  field_map?: Record<string, string>;
+  timeout_sec?: number;
+  rate_limit_min_sec?: number;
+  rate_limit_max_sec?: number;
 }
 
 export interface OverviewResponse {
