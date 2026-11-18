@@ -1,5 +1,5 @@
 -- =============================================================================
--- Phone Price Ledger — PostgreSQL 16 Schema (No Authentication Required)
+-- Swapup Scrapper — PostgreSQL 16 Schema (No Authentication Required)
 -- Supports:
 --   1. Buy · Refurbished (side = 'buy'   : cashify_buy, Amazon India)
 --   2. Sell · Buyback    (side = 'sell'  : cashify_sell, amazon_sell, partner APIs)

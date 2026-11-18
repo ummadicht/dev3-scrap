@@ -201,7 +201,7 @@ export default function App() {
       <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
         <div className="flex h-14 items-center border-b border-slate-200 px-5">
           <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap">
-            Phone Price Ledger
+            Swapup Scrapper
           </span>
         </div>
         <nav className="flex-1 space-y-1 p-3" aria-label="Workspace navigation">
